@@ -1,593 +1,592 @@
-1|<!DOCTYPE html>
-2|<html lang="pt">
-3|<head>
-4|    <meta charset="UTF-8">
-5|    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-6|    <title>Sistema de Manutenção - CELP</title>
-7|    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-8|    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-9|    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-10|    <script src="https://cdn.tailwindcss.com"></script>
-11|    <style>
-12|        /* Estilos personalizados CELP */
-13|        .stats-card {
-14|            @apply bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100;
-15|        }
-16|        .stats-card:hover {
-17|            transform: translateY(-2px);
-18|        }
-19|        .stats-card-total { @apply bg-gradient-to-br from-blue-500 to-blue-600 text-white; }
-20|        .stats-card-pending { @apply bg-gradient-to-br from-yellow-500 to-orange-500 text-white; }
-21|        .stats-card-progress { @apply bg-gradient-to-br from-indigo-500 to-purple-600 text-white; }
-22|        .stats-card-completed { @apply bg-gradient-to-br from-green-500 to-emerald-600 text-white; }
-23|        .stats-card-urgent { @apply bg-gradient-to-br from-red-500 to-pink-600 text-white; }
-24|        .stats-card-projects { @apply bg-gradient-to-br from-purple-500 to-indigo-600 text-white; }
-25|        
-26|        .nav-item { @apply px-4 py-2 rounded-xl font-medium flex items-center transition-all duration-200; }
-27|        .nav-item-active { @apply bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-lg; }
-28|        .nav-item-inactive { @apply bg-white text-gray-600 hover:bg-purple-50 hover:text-purple-600 border border-gray-200; }
-29|        
-30|        .task-card { @apply bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-200 border border-gray-100; }
-31|        .task-card:hover { transform: translateY(-1px); }
-32|        
-33|        .priority-badge { @apply px-3 py-1 rounded-full text-xs font-semibold; }
-34|        .priority-baixa { @apply bg-gray-100 text-gray-700; }
-35|        .priority-media { @apply bg-blue-100 text-blue-700; }
-36|        .priority-alta { @apply bg-orange-100 text-orange-700; }
-37|        .priority-urgente { @apply bg-red-100 text-red-700; }
-38|        
-39|        .status-badge { @apply px-3 py-1 rounded-full text-xs font-semibold; }
-40|        .status-pendente { @apply bg-yellow-100 text-yellow-700; }
-41|        .status-em_progresso { @apply bg-blue-100 text-blue-700; }
-42|        .status-concluida { @apply bg-green-100 text-green-700; }
-43|        
-44|        .category-badge { @apply px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700; }
-45|        .btn-primary { @apply bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-6 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-200 border-0; }
-46|        .btn-secondary { @apply bg-white text-gray-700 px-6 py-3 rounded-xl font-medium hover:bg-gray-50 transition-all duration-200 border border-gray-300; }
-47|        .form-input { @apply w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200; }
-48|        .form-label { @apply block text-sm font-medium text-gray-700 mb-2; }
-49|        .form-select { @apply w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white transition-all duration-200; }
-50|    </style>
-51|</head>
-52|<body>
-53|    <div id="root"></div>
-54|
-55|    <script type="text/babel">
-56|        const { useState, useEffect, createContext, useContext } = React;
-57|
-58|        // Dados simulados para demonstração
-59|        const mockUsers = [
-60|            { id: "1", nome: "Administrador CELP", email: "admin@escola.com", cargo: "chefe", ativo: true },
-61|            { id: "2", nome: "João Silva", email: "joao@escola.com", cargo: "supervisor", ativo: true },
-62|            { id: "3", nome: "Maria Santos", email: "maria@escola.com", cargo: "tecnico", ativo: true },
-63|            { id: "4", nome: "Pedro Costa", email: "pedro@escola.com", cargo: "tecnico", ativo: true }
-64|        ];
-65|
-66|        const mockTasks = [
-67|            {
-68|                id: "1", titulo: "Reparar ar condicionado da sala 201", descricao: "Sistema de AC não está funcionando, precisa verificação elétrica",
-69|                categoria: "ac", prioridade: "alta", status: "pendente", atribuido_a: "2", criado_por: "1", projeto_id: null,
-70|                data_vencimento: "2025-01-25T10:00:00Z", criado_em: "2025-01-18T09:00:00Z", atualizado_em: "2025-01-18T09:00:00Z"
-71|            },
-72|            {
-73|                id: "2", titulo: "Verificar canalização do laboratório", descricao: "Vazamento reportado no laboratório de química",
-74|                categoria: "canalizacao", prioridade: "urgente", status: "em_progresso", atribuido_a: "3", criado_por: "1", projeto_id: "1",
-75|                data_vencimento: "2025-01-20T16:00:00Z", criado_em: "2025-01-17T14:30:00Z", atualizado_em: "2025-01-18T08:15:00Z"
-76|            },
-77|            {
-78|                id: "3", titulo: "Instalação elétrica nova ala", descricao: "Finalizar instalação elétrica da nova ala do prédio principal",
-79|                categoria: "eletrica", prioridade: "media", status: "em_progresso", atribuido_a: "4", criado_por: "2", projeto_id: "1",
-80|                data_vencimento: "2025-02-01T17:00:00Z", criado_em: "2025-01-15T11:00:00Z", atualizado_em: "2025-01-18T07:45:00Z"
-81|            },
-82|            {
-83|                id: "4", titulo: "Manutenção geral portões principais", descricao: "Lubrificação e verificação dos portões de entrada da escola",
-84|                categoria: "reparacoes_gerais", prioridade: "baixa", status: "pendente", atribuido_a: "3", criado_por: "1", projeto_id: null,
-85|                data_vencimento: "2025-01-30T12:00:00Z", criado_em: "2025-01-16T16:20:00Z", atualizado_em: "2025-01-16T16:20:00Z"
-86|            },
-87|            {
-88|                id: "5", titulo: "Reparação obra ginásio", descricao: "Acabamentos finais na obra de renovação do ginásio",
-89|                categoria: "obras", prioridade: "media", status: "concluida", atribuido_a: "2", criado_por: "1", projeto_id: "1",
-90|                data_vencimento: "2025-01-15T18:00:00Z", criado_em: "2025-01-10T09:30:00Z", atualizado_em: "2025-01-15T17:45:00Z"
-91|            }
-92|        ];
-93|
-94|        const mockProjects = [
-95|            {
-96|                id: "1", nome: "Renovação Prédio Principal", descricao: "Projeto completo de renovação e modernização do prédio principal da CELP",
-97|                status: "em_progresso", criado_por: "1", data_inicio: "2025-01-01T08:00:00Z", data_fim: "2025-03-31T18:00:00Z", criado_em: "2024-12-15T10:00:00Z"
-98|            }
-99|        ];
-100|
-101|        // Credenciais simuladas
-102|        const mockCredentials = {
-103|            "admin@escola.com": { senha: "admin123", user: mockUsers[0] },
-104|            "joao@escola.com": { senha: "123456", user: mockUsers[1] },
-105|            "maria@escola.com": { senha: "123456", user: mockUsers[2] },
-106|            "pedro@escola.com": { senha: "123456", user: mockUsers[3] }
-107|        };
-108|
-109|        // API simulada
-110|        const mockAPI = {
-111|            async login(email, senha) {
-112|                await new Promise(resolve => setTimeout(resolve, 500));
-113|                const cred = mockCredentials[email];
-114|                if (cred && cred.senha === senha) {
-115|                    return { access_token: `mock-token-${Date.now()}`, token_type: "bearer", user: cred.user };
-116|                }
-117|                throw new Error("Credenciais inválidas");
-118|            },
-119|            async getTasks(filters = {}) {
-120|                await new Promise(resolve => setTimeout(resolve, 300));
-121|                let tasks = [...mockTasks];
-122|                if (filters.status) tasks = tasks.filter(t => t.status === filters.status);
-123|                if (filters.categoria) tasks = tasks.filter(t => t.categoria === filters.categoria);
-124|                if (filters.atribuido_a) tasks = tasks.filter(t => t.atribuido_a === filters.atribuido_a);
-125|                if (filters.projeto_id) tasks = tasks.filter(t => t.projeto_id === filters.projeto_id);
-126|                return tasks;
-127|            },
-128|            async getUsers() {
-129|                return mockUsers.filter(u => u.ativo);
-130|            },
-131|            async getProjects() {
-132|                return [...mockProjects];
-133|            },
-134|            async getDashboardStats() {
-135|                await new Promise(resolve => setTimeout(resolve, 400));
-136|                return {
-137|                    total_tasks: mockTasks.length,
-138|                    pending_tasks: mockTasks.filter(t => t.status === "pendente").length,
-139|                    in_progress_tasks: mockTasks.filter(t => t.status === "em_progresso").length,
-140|                    completed_tasks: mockTasks.filter(t => t.status === "concluida").length,
-141|                    urgent_tasks: mockTasks.filter(t => t.prioridade === "urgente").length,
-142|                    total_projects: mockProjects.length,
-143|                    active_projects: mockProjects.filter(p => p.status !== "concluida").length
-144|                };
-145|            }
-146|        };
-147|
-148|        // Context de autenticação
-149|        const AuthContext = createContext();
-150|        const useAuth = () => useContext(AuthContext);
-151|
-152|        const AuthProvider = ({ children }) => {
-153|            const [user, setUser] = useState(null);
-154|            const [loading, setLoading] = useState(true);
-155|
-156|            useEffect(() => {
-157|                const token = localStorage.getItem('celp_token');
-158|                if (token) {
-159|                    const userData = localStorage.getItem('celp_user');
-160|                    if (userData) {
-161|                        setUser(JSON.parse(userData));
-162|                    }
-163|                }
-164|                setLoading(false);
-165|            }, []);
-166|
-167|            const login = async (email, senha) => {
-168|                try {
-169|                    const response = await mockAPI.login(email, senha);
-170|                    localStorage.setItem('celp_token', response.access_token);
-171|                    localStorage.setItem('celp_user', JSON.stringify(response.user));
-172|                    setUser(response.user);
-173|                    return { success: true };
-174|                } catch (error) {
-175|                    return { success: false, error: error.message };
-176|                }
-177|            };
-178|
-179|            const logout = () => {
-180|                localStorage.removeItem('celp_token');
-181|                localStorage.removeItem('celp_user');
-182|                setUser(null);
-183|            };
-184|
-185|            return (
-186|                <AuthContext.Provider value={{ user, login, logout, loading }}>
-187|                    {children}
-188|                </AuthContext.Provider>
-189|            );
-190|        };
-191|
-192|        // Componente de Login
-193|        const Login = () => {
-194|            const [email, setEmail] = useState('');
-195|            const [senha, setSenha] = useState('');
-196|            const [error, setError] = useState('');
-197|            const [loading, setLoading] = useState(false);
-198|            const { login } = useAuth();
-199|
-200|            const handleSubmit = async (e) => {
-201|                e.preventDefault();
-202|                setLoading(true);
-203|                setError('');
-204|
-205|                const result = await login(email, senha);
-206|                if (!result.success) {
-207|                    setError(result.error);
-208|                }
-209|                setLoading(false);
-210|            };
-211|
-212|            return (
-213|                <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 flex items-center justify-center p-4">
-214|                    <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-215|                        <div className="text-center mb-8">
-216|                            <h1 className="text-3xl font-bold text-gray-900 mb-2">Sistema de Manutenção</h1>
-217|                            <p className="text-gray-600">Escola Portuguesa de Luanda - CELP</p>
-218|                            <p className="text-sm text-purple-600 mt-2">Versão Demo - GitHub Pages</p>
-219|                        </div>
-220|
-221|                        <form onSubmit={handleSubmit} className="space-y-6">
-222|                            <div>
-223|                                <label className="form-label">Email</label>
-224|                                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="form-input" required />
-225|                            </div>
-226|                            <div>
-227|                                <label className="form-label">Senha</label>
-228|                                <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} className="form-input" required />
-229|                            </div>
-230|                            {error && (
-231|                                <div className="bg-red-50 border border-red-200 rounded-xl p-3">
-232|                                    <p className="text-red-600 text-sm">{error}</p>
-233|                                </div>
-234|                            )}
-235|                            <button type="submit" disabled={loading} className="w-full btn-primary">
-236|                                {loading ? 'Aguarde...' : 'Entrar'}
-237|                            </button>
-238|                        </form>
-239|
-240|                        <div className="mt-6 p-4 bg-gray-50 rounded-xl">
-241|                            <h3 className="font-semibold text-gray-900 mb-2">Credenciais de Teste:</h3>
-242|                            <div className="text-sm text-gray-600 space-y-1">
-243|                                <p><strong>Chefe:</strong> admin@escola.com / admin123</p>
-244|                                <p><strong>Supervisor:</strong> joao@escola.com / 123456</p>
-245|                                <p><strong>Técnicos:</strong> maria@escola.com / 123456</p>
-246|                            </div>
-247|                        </div>
-248|                    </div>
-249|                </div>
-250|            );
-251|        };
-252|
-253|        // Dashboard Stats
-254|        const DashboardStats = ({ stats }) => {
-255|            if (!stats) return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div></div>;
-256|
-257|            return (
-258|                <div>
-259|                    <h2 className="text-2xl font-bold text-gray-900 mb-6">Visão Geral</h2>
-260|                    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-261|                        <p className="text-blue-800 text-sm"><strong>Demo GitHub Pages:</strong> Versão de demonstração com dados simulados.</p>
-262|                    </div>
-263|                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-264|                        <div className="stats-card stats-card-total">
-265|                            <div className="flex items-center justify-between">
-266|                                <div>
-267|                                    <p className="text-white/80 text-sm font-medium">Total de Tarefas</p>
-268|                                    <p className="text-3xl font-bold text-white">{stats.total_tasks}</p>
-269|                                </div>
-270|                            </div>
-271|                        </div>
-272|                        <div className="stats-card stats-card-pending">
-273|                            <div className="flex items-center justify-between">
-274|                                <div>
-275|                                    <p className="text-white/80 text-sm font-medium">Pendentes</p>
-276|                                    <p className="text-3xl font-bold text-white">{stats.pending_tasks}</p>
-277|                                </div>
-278|                            </div>
-279|                        </div>
-280|                        <div className="stats-card stats-card-progress">
-281|                            <div className="flex items-center justify-between">
-282|                                <div>
-283|                                    <p className="text-white/80 text-sm font-medium">Em Progresso</p>
-284|                                    <p className="text-3xl font-bold text-white">{stats.in_progress_tasks}</p>
-285|                                </div>
-286|                            </div>
-287|                        </div>
-288|                        <div className="stats-card stats-card-completed">
-289|                            <div className="flex items-center justify-between">
-290|                                <div>
-291|                                    <p className="text-white/80 text-sm font-medium">Concluídas</p>
-292|                                    <p className="text-3xl font-bold text-white">{stats.completed_tasks}</p>
-293|                                </div>
-294|                            </div>
-295|                        </div>
-296|                        <div className="stats-card stats-card-urgent">
-297|                            <div className="flex items-center justify-between">
-298|                                <div>
-299|                                    <p className="text-white/80 text-sm font-medium">Urgentes</p>
-300|                                    <p className="text-3xl font-bold text-white">{stats.urgent_tasks}</p>
-301|                                </div>
-302|                            </div>
-303|                        </div>
-304|                        <div className="stats-card stats-card-projects">
-305|                            <div className="flex items-center justify-between">
-306|                                <div>
-307|                                    <p className="text-white/80 text-sm font-medium">Projetos Ativos</p>
-308|                                    <p className="text-3xl font-bold text-white">{stats.active_projects}</p>
-309|                                </div>
-310|                            </div>
-311|                        </div>
-312|                    </div>
-313|                </div>
-314|            );
-315|        };
-316|
-317|        // Task Manager
-318|        const TaskManager = () => {
-319|            const [tasks, setTasks] = useState([]);
-320|            const [users, setUsers] = useState([]);
-321|            const [loading, setLoading] = useState(true);
-322|
-323|            useEffect(() => {
-324|                fetchData();
-325|            }, []);
-326|
-327|            const fetchData = async () => {
-328|                try {
-329|                    const [tasksData, usersData] = await Promise.all([
-330|                        mockAPI.getTasks(),
-331|                        mockAPI.getUsers()
-332|                    ]);
-333|                    setTasks(tasksData);
-334|                    setUsers(usersData);
-335|                } catch (error) {
-336|                    console.error('Erro:', error);
-337|                } finally {
-338|                    setLoading(false);
-339|                }
-340|            };
-341|
-342|            const getCategoryName = (category) => {
-343|                const names = {
-344|                    eletrica: 'Elétrica', canalizacao: 'Canalização', ac: 'Ar Condicionado',
-345|                    obras: 'Obras', reparacoes_gerais: 'Reparações Gerais'
-346|                };
-347|                return names[category] || category;
-348|            };
-349|
-350|            const getPriorityName = (priority) => {
-351|                const names = { baixa: 'Baixa', media: 'Média', alta: 'Alta', urgente: 'Urgente' };
-352|                return names[priority] || priority;
-353|            };
-354|
-355|            const getStatusName = (status) => {
-356|                const names = { pendente: 'Pendente', em_progresso: 'Em Progresso', concluida: 'Concluída' };
-357|                return names[status] || status;
-358|            };
-359|
-360|            if (loading) return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div></div>;
-361|
-362|            return (
-363|                <div>
-364|                    <h2 className="text-2xl font-bold text-gray-900 mb-6">Gestão de Tarefas</h2>
-365|                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-366|                        {tasks.map(task => (
-367|                            <div key={task.id} className="task-card">
-368|                                <h3 className="font-semibold text-gray-900 text-lg mb-2">{task.titulo}</h3>
-369|                                <p className="text-gray-600 text-sm mb-4">{task.descricao}</p>
-370|                                <div className="flex flex-wrap gap-2 mb-4">
-371|                                    <span className={`priority-badge priority-${task.prioridade}`}>{getPriorityName(task.prioridade)}</span>
-372|                                    <span className={`status-badge status-${task.status}`}>{getStatusName(task.status)}</span>
-373|                                    <span className="category-badge">{getCategoryName(task.categoria)}</span>
-374|                                </div>
-375|                                {task.atribuido_a && (
-376|                                    <p className="text-sm text-gray-600 mb-3">
-377|                                        Atribuído a: {users.find(u => u.id === task.atribuido_a)?.nome}
-378|                                    </p>
-379|                                )}
-380|                                {task.data_vencimento && (
-381|                                    <p className="text-sm text-gray-600">
-382|                                        Vencimento: {new Date(task.data_vencimento).toLocaleDateString('pt-BR')}
-383|                                    </p>
-384|                                )}
-385|                            </div>
-386|                        ))}
-387|                    </div>
-388|                </div>
-389|            );
-390|        };
-391|
-392|        // Project Manager
-393|        const ProjectManager = () => {
-394|            const [projects, setProjects] = useState([]);
-395|            const [selectedProject, setSelectedProject] = useState(null);
-396|            const [tasks, setTasks] = useState([]);
-397|            const [loading, setLoading] = useState(true);
-398|
-399|            useEffect(() => {
-400|                fetchProjects();
-401|            }, []);
-402|
-403|            const fetchProjects = async () => {
-404|                try {
-405|                    const data = await mockAPI.getProjects();
-406|                    setProjects(data);
-407|                } catch (error) {
-408|                    console.error('Erro:', error);
-409|                } finally {
-410|                    setLoading(false);
-411|                }
-412|            };
-413|
-414|            const fetchProjectTasks = async (projectId) => {
-415|                try {
-416|                    const data = await mockAPI.getTasks({ projeto_id: projectId });
-417|                    setTasks(data);
-418|                } catch (error) {
-419|                    console.error('Erro:', error);
-420|                }
-421|            };
-422|
-423|            const getTasksByStatus = (status) => tasks.filter(task => task.status === status);
-424|
-425|            if (loading) return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div></div>;
-426|
-427|            if (selectedProject) {
-428|                return (
-429|                    <div>
-430|                        <div className="flex items-center mb-6">
-431|                            <button onClick={() => setSelectedProject(null)} className="mr-4 text-gray-600 hover:text-gray-800">
-432|                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-433|                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-434|                                </svg>
-435|                            </button>
-436|                            <div>
-437|                                <h2 className="text-2xl font-bold text-gray-900">{selectedProject.nome}</h2>
-438|                                <p className="text-gray-600">{selectedProject.descricao}</p>
-439|                            </div>
-440|                        </div>
-441|
-442|                        <div className="flex space-x-6 overflow-x-auto pb-6">
-443|                            {['pendente', 'em_progresso', 'concluida'].map(status => (
-444|                                <div key={status} className="bg-gray-50 rounded-2xl p-4 min-w-80">
-445|                                    <div className="flex items-center justify-between mb-4">
-446|                                        <h3 className="font-semibold text-gray-900">
-447|                                            {status === 'pendente' ? 'Pendente' : status === 'em_progresso' ? 'Em Progresso' : 'Concluída'}
-448|                                        </h3>
-449|                                        <span className={`px-2 py-1 rounded-full text-sm font-medium ${
-450|                                            status === 'pendente' ? 'bg-yellow-100 text-yellow-700' :
-451|                                            status === 'em_progresso' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
-452|                                        }`}>
-453|                                            {getTasksByStatus(status).length}
-454|                                        </span>
-455|                                    </div>
-456|                                    <div className="space-y-3">
-457|                                        {getTasksByStatus(status).map(task => (
-458|                                            <div key={task.id} className="bg-white rounded-xl p-3 shadow-sm">
-459|                                                <h4 className="font-semibold text-gray-900 mb-2">{task.titulo}</h4>
-460|                                                <p className="text-sm text-gray-600 mb-3">{task.descricao}</p>
-461|                                                <span className={`priority-badge priority-${task.prioridade}`}>
-462|                                                    {task.prioridade}
-463|                                                </span>
-464|                                            </div>
-465|                                        ))}
-466|                                    </div>
-467|                                </div>
-468|                            ))}
-469|                        </div>
-470|                    </div>
-471|                );
-472|            }
-473|
-474|            return (
-475|                <div>
-476|                    <h2 className="text-2xl font-bold text-gray-900 mb-6">Gestão de Projetos</h2>
-477|                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-478|                        {projects.map(project => (
-479|                            <div key={project.id} className="task-card cursor-pointer" onClick={() => {
-480|                                setSelectedProject(project);
-481|                                fetchProjectTasks(project.id);
-482|                            }}>
-483|                                <h3 className="font-semibold text-gray-900 text-lg mb-2">{project.nome}</h3>
-484|                                <p className="text-gray-600 text-sm mb-4">{project.descricao}</p>
-485|                                <div className="flex items-center justify-between">
-486|                                    <span className={`status-badge status-${project.status}`}>
-487|                                        {project.status === 'em_progresso' ? 'Em Progresso' : 'Pendente'}
-488|                                    </span>
-489|                                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-490|                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-491|                                    </svg>
-492|                                </div>
-493|                            </div>
-494|                        ))}
-495|                    </div>
-496|                </div>
-497|            );
-498|        };
-499|
-500|        // Dashboard Principal
-501|        const Dashboard = () => {
-502|            const { user, logout } = useAuth();
-503|            const [currentView, setCurrentView] = useState('dashboard');
-504|            const [stats, setStats] = useState(null);
-505|
-506|            useEffect(() => {
-507|                fetchStats();
-508|            }, []);
-509|
-510|            const fetchStats = async () => {
-511|                try {
-512|                    const data = await mockAPI.getDashboardStats();
-513|                    setStats(data);
-514|                } catch (error) {
-515|                    console.error('Erro:', error);
-516|                }
-517|            };
-518|
-519|            const renderContent = () => {
-520|                switch (currentView) {
-521|                    case 'tasks': return <TaskManager />;
-522|                    case 'projects': return <ProjectManager />;
-523|                    default: return <DashboardStats stats={stats} />;
-524|                }
-525|            };
-526|
-527|            return (
-528|                <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100">
-529|                    <header className="bg-white shadow-sm border-b border-gray-200">
-530|                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-531|                            <div className="flex justify-between items-center h-16">
-532|                                <div className="flex items-center">
-533|                                    <h1 className="text-2xl font-bold text-gray-900">Sistema de Manutenção - CELP</h1>
-534|                                    <span className="ml-3 px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">Demo GitHub Pages</span>
-535|                                </div>
-536|                                <div className="flex items-center space-x-4">
-537|                                    <span className="text-sm text-gray-600">{user?.nome} ({user?.cargo})</span>
-538|                                    <button onClick={logout} className="text-sm text-red-600 hover:text-red-800 font-medium">Sair</button>
-539|                                </div>
-540|                            </div>
-541|                        </div>
-542|                    </header>
-543|
-544|                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-545|                        <nav className="mb-8">
-546|                            <div className="flex space-x-4">
-547|                                {[
-548|                                    { key: 'dashboard', label: 'Dashboard', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-549|                                    { key: 'tasks', label: 'Tarefas', icon: 'M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
-550|                                    { key: 'projects', label: 'Projetos', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' }
-551|                                ].map(item => (
-552|                                    <button key={item.key} onClick={() => setCurrentView(item.key)} 
-553|                                            className={`nav-item ${currentView === item.key ? 'nav-item-active' : 'nav-item-inactive'}`}>
-554|                                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-555|                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
-556|                                        </svg>
-557|                                        {item.label}
-558|                                    </button>
-559|                                ))}
-560|                            </div>
-561|                        </nav>
-562|                        <main>{renderContent()}</main>
-563|                    </div>
-564|                </div>
-565|            );
-566|        };
-567|
-568|        // Componente principal
-569|        const App = () => {
-570|            const { user, loading } = useAuth();
-571|
-572|            if (loading) {
-573|                return (
-574|                    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 flex items-center justify-center">
-575|                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
-576|                    </div>
-577|                );
-578|            }
-579|
-580|            return user ? <Dashboard /> : <Login />;
-581|        };
-582|
-583|        // Render da aplicação
-584|        ReactDOM.render(
-585|            <AuthProvider>
-586|                <App />
-587|            </AuthProvider>,
-588|            document.getElementById('root')
-589|        );
-590|    </script>
-591|</body>
-592|</html>
- "Sistema CELP - Versão inicial"
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Manutenção - CELP</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos personalizados CELP */
+        .stats-card {
+            @apply bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-100;
+        }
+        .stats-card:hover {
+            transform: translateY(-2px);
+        }
+        .stats-card-total { @apply bg-gradient-to-br from-blue-500 to-blue-600 text-white; }
+        .stats-card-pending { @apply bg-gradient-to-br from-yellow-500 to-orange-500 text-white; }
+        .stats-card-progress { @apply bg-gradient-to-br from-indigo-500 to-purple-600 text-white; }
+        .stats-card-completed { @apply bg-gradient-to-br from-green-500 to-emerald-600 text-white; }
+        .stats-card-urgent { @apply bg-gradient-to-br from-red-500 to-pink-600 text-white; }
+        .stats-card-projects { @apply bg-gradient-to-br from-purple-500 to-indigo-600 text-white; }
+        
+        .nav-item { @apply px-4 py-2 rounded-xl font-medium flex items-center transition-all duration-200; }
+        .nav-item-active { @apply bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-lg; }
+        .nav-item-inactive { @apply bg-white text-gray-600 hover:bg-purple-50 hover:text-purple-600 border border-gray-200; }
+        
+        .task-card { @apply bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-200 border border-gray-100; }
+        .task-card:hover { transform: translateY(-1px); }
+        
+        .priority-badge { @apply px-3 py-1 rounded-full text-xs font-semibold; }
+        .priority-baixa { @apply bg-gray-100 text-gray-700; }
+        .priority-media { @apply bg-blue-100 text-blue-700; }
+        .priority-alta { @apply bg-orange-100 text-orange-700; }
+        .priority-urgente { @apply bg-red-100 text-red-700; }
+        
+        .status-badge { @apply px-3 py-1 rounded-full text-xs font-semibold; }
+        .status-pendente { @apply bg-yellow-100 text-yellow-700; }
+        .status-em_progresso { @apply bg-blue-100 text-blue-700; }
+        .status-concluida { @apply bg-green-100 text-green-700; }
+        
+        .category-badge { @apply px-3 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700; }
+        .btn-primary { @apply bg-gradient-to-r from-purple-500 to-indigo-600 text-white px-6 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-200 border-0; }
+        .btn-secondary { @apply bg-white text-gray-700 px-6 py-3 rounded-xl font-medium hover:bg-gray-50 transition-all duration-200 border border-gray-300; }
+        .form-input { @apply w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200; }
+        .form-label { @apply block text-sm font-medium text-gray-700 mb-2; }
+        .form-select { @apply w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white transition-all duration-200; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, createContext, useContext } = React;
+
+        // Dados simulados para demonstração
+        const mockUsers = [
+            { id: "1", nome: "Administrador CELP", email: "admin@escola.com", cargo: "chefe", ativo: true },
+            { id: "2", nome: "João Silva", email: "joao@escola.com", cargo: "supervisor", ativo: true },
+            { id: "3", nome: "Maria Santos", email: "maria@escola.com", cargo: "tecnico", ativo: true },
+            { id: "4", nome: "Pedro Costa", email: "pedro@escola.com", cargo: "tecnico", ativo: true }
+        ];
+
+        const mockTasks = [
+            {
+                id: "1", titulo: "Reparar ar condicionado da sala 201", descricao: "Sistema de AC não está funcionando, precisa verificação elétrica",
+                categoria: "ac", prioridade: "alta", status: "pendente", atribuido_a: "2", criado_por: "1", projeto_id: null,
+                data_vencimento: "2025-01-25T10:00:00Z", criado_em: "2025-01-18T09:00:00Z", atualizado_em: "2025-01-18T09:00:00Z"
+            },
+            {
+                id: "2", titulo: "Verificar canalização do laboratório", descricao: "Vazamento reportado no laboratório de química",
+                categoria: "canalizacao", prioridade: "urgente", status: "em_progresso", atribuido_a: "3", criado_por: "1", projeto_id: "1",
+                data_vencimento: "2025-01-20T16:00:00Z", criado_em: "2025-01-17T14:30:00Z", atualizado_em: "2025-01-18T08:15:00Z"
+            },
+            {
+                id: "3", titulo: "Instalação elétrica nova ala", descricao: "Finalizar instalação elétrica da nova ala do prédio principal",
+                categoria: "eletrica", prioridade: "media", status: "em_progresso", atribuido_a: "4", criado_por: "2", projeto_id: "1",
+                data_vencimento: "2025-02-01T17:00:00Z", criado_em: "2025-01-15T11:00:00Z", atualizado_em: "2025-01-18T07:45:00Z"
+            },
+            {
+                id: "4", titulo: "Manutenção geral portões principais", descricao: "Lubrificação e verificação dos portões de entrada da escola",
+                categoria: "reparacoes_gerais", prioridade: "baixa", status: "pendente", atribuido_a: "3", criado_por: "1", projeto_id: null,
+                data_vencimento: "2025-01-30T12:00:00Z", criado_em: "2025-01-16T16:20:00Z", atualizado_em: "2025-01-16T16:20:00Z"
+            },
+            {
+                id: "5", titulo: "Reparação obra ginásio", descricao: "Acabamentos finais na obra de renovação do ginásio",
+                categoria: "obras", prioridade: "media", status: "concluida", atribuido_a: "2", criado_por: "1", projeto_id: "1",
+                data_vencimento: "2025-01-15T18:00:00Z", criado_em: "2025-01-10T09:30:00Z", atualizado_em: "2025-01-15T17:45:00Z"
+            }
+        ];
+
+        const mockProjects = [
+            {
+                id: "1", nome: "Renovação Prédio Principal", descricao: "Projeto completo de renovação e modernização do prédio principal da CELP",
+                status: "em_progresso", criado_por: "1", data_inicio: "2025-01-01T08:00:00Z", data_fim: "2025-03-31T18:00:00Z", criado_em: "2024-12-15T10:00:00Z"
+            }
+        ];
+
+        // Credenciais simuladas
+        const mockCredentials = {
+            "admin@escola.com": { senha: "admin123", user: mockUsers[0] },
+            "joao@escola.com": { senha: "123456", user: mockUsers[1] },
+            "maria@escola.com": { senha: "123456", user: mockUsers[2] },
+            "pedro@escola.com": { senha: "123456", user: mockUsers[3] }
+        };
+
+        // API simulada
+        const mockAPI = {
+            async login(email, senha) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                const cred = mockCredentials[email];
+                if (cred && cred.senha === senha) {
+                    return { access_token: `mock-token-${Date.now()}`, token_type: "bearer", user: cred.user };
+                }
+                throw new Error("Credenciais inválidas");
+            },
+            async getTasks(filters = {}) {
+                await new Promise(resolve => setTimeout(resolve, 300));
+                let tasks = [...mockTasks];
+                if (filters.status) tasks = tasks.filter(t => t.status === filters.status);
+                if (filters.categoria) tasks = tasks.filter(t => t.categoria === filters.categoria);
+                if (filters.atribuido_a) tasks = tasks.filter(t => t.atribuido_a === filters.atribuido_a);
+                if (filters.projeto_id) tasks = tasks.filter(t => t.projeto_id === filters.projeto_id);
+                return tasks;
+            },
+            async getUsers() {
+                return mockUsers.filter(u => u.ativo);
+            },
+            async getProjects() {
+                return [...mockProjects];
+            },
+            async getDashboardStats() {
+                await new Promise(resolve => setTimeout(resolve, 400));
+                return {
+                    total_tasks: mockTasks.length,
+                    pending_tasks: mockTasks.filter(t => t.status === "pendente").length,
+                    in_progress_tasks: mockTasks.filter(t => t.status === "em_progresso").length,
+                    completed_tasks: mockTasks.filter(t => t.status === "concluida").length,
+                    urgent_tasks: mockTasks.filter(t => t.prioridade === "urgente").length,
+                    total_projects: mockProjects.length,
+                    active_projects: mockProjects.filter(p => p.status !== "concluida").length
+                };
+            }
+        };
+
+        // Context de autenticação
+        const AuthContext = createContext();
+        const useAuth = () => useContext(AuthContext);
+
+        const AuthProvider = ({ children }) => {
+            const [user, setUser] = useState(null);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                const token = localStorage.getItem('celp_token');
+                if (token) {
+                    const userData = localStorage.getItem('celp_user');
+                    if (userData) {
+                        setUser(JSON.parse(userData));
+                    }
+                }
+                setLoading(false);
+            }, []);
+
+            const login = async (email, senha) => {
+                try {
+                    const response = await mockAPI.login(email, senha);
+                    localStorage.setItem('celp_token', response.access_token);
+                    localStorage.setItem('celp_user', JSON.stringify(response.user));
+                    setUser(response.user);
+                    return { success: true };
+                } catch (error) {
+                    return { success: false, error: error.message };
+                }
+            };
+
+            const logout = () => {
+                localStorage.removeItem('celp_token');
+                localStorage.removeItem('celp_user');
+                setUser(null);
+            };
+
+            return (
+                <AuthContext.Provider value={{ user, login, logout, loading }}>
+                    {children}
+                </AuthContext.Provider>
+            );
+        };
+
+        // Componente de Login
+        const Login = () => {
+            const [email, setEmail] = useState('');
+            const [senha, setSenha] = useState('');
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
+            const { login } = useAuth();
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                setError('');
+
+                const result = await login(email, senha);
+                if (!result.success) {
+                    setError(result.error);
+                }
+                setLoading(false);
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+                        <div className="text-center mb-8">
+                            <h1 className="text-3xl font-bold text-gray-900 mb-2">Sistema de Manutenção</h1>
+                            <p className="text-gray-600">Escola Portuguesa de Luanda - CELP</p>
+                            <p className="text-sm text-purple-600 mt-2">Versão Demo - GitHub Pages</p>
+                        </div>
+
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div>
+                                <label className="form-label">Email</label>
+                                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="form-input" required />
+                            </div>
+                            <div>
+                                <label className="form-label">Senha</label>
+                                <input type="password" value={senha} onChange={(e) => setSenha(e.target.value)} className="form-input" required />
+                            </div>
+                            {error && (
+                                <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                                    <p className="text-red-600 text-sm">{error}</p>
+                                </div>
+                            )}
+                            <button type="submit" disabled={loading} className="w-full btn-primary">
+                                {loading ? 'Aguarde...' : 'Entrar'}
+                            </button>
+                        </form>
+
+                        <div className="mt-6 p-4 bg-gray-50 rounded-xl">
+                            <h3 className="font-semibold text-gray-900 mb-2">Credenciais de Teste:</h3>
+                            <div className="text-sm text-gray-600 space-y-1">
+                                <p><strong>Chefe:</strong> admin@escola.com / admin123</p>
+                                <p><strong>Supervisor:</strong> joao@escola.com / 123456</p>
+                                <p><strong>Técnicos:</strong> maria@escola.com / 123456</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Dashboard Stats
+        const DashboardStats = ({ stats }) => {
+            if (!stats) return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div></div>;
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-6">Visão Geral</h2>
+                    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                        <p className="text-blue-800 text-sm"><strong>Demo GitHub Pages:</strong> Versão de demonstração com dados simulados.</p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="stats-card stats-card-total">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-white/80 text-sm font-medium">Total de Tarefas</p>
+                                    <p className="text-3xl font-bold text-white">{stats.total_tasks}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="stats-card stats-card-pending">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-white/80 text-sm font-medium">Pendentes</p>
+                                    <p className="text-3xl font-bold text-white">{stats.pending_tasks}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="stats-card stats-card-progress">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-white/80 text-sm font-medium">Em Progresso</p>
+                                    <p className="text-3xl font-bold text-white">{stats.in_progress_tasks}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="stats-card stats-card-completed">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-white/80 text-sm font-medium">Concluídas</p>
+                                    <p className="text-3xl font-bold text-white">{stats.completed_tasks}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="stats-card stats-card-urgent">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-white/80 text-sm font-medium">Urgentes</p>
+                                    <p className="text-3xl font-bold text-white">{stats.urgent_tasks}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="stats-card stats-card-projects">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-white/80 text-sm font-medium">Projetos Ativos</p>
+                                    <p className="text-3xl font-bold text-white">{stats.active_projects}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Task Manager
+        const TaskManager = () => {
+            const [tasks, setTasks] = useState([]);
+            const [users, setUsers] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                fetchData();
+            }, []);
+
+            const fetchData = async () => {
+                try {
+                    const [tasksData, usersData] = await Promise.all([
+                        mockAPI.getTasks(),
+                        mockAPI.getUsers()
+                    ]);
+                    setTasks(tasksData);
+                    setUsers(usersData);
+                } catch (error) {
+                    console.error('Erro:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const getCategoryName = (category) => {
+                const names = {
+                    eletrica: 'Elétrica', canalizacao: 'Canalização', ac: 'Ar Condicionado',
+                    obras: 'Obras', reparacoes_gerais: 'Reparações Gerais'
+                };
+                return names[category] || category;
+            };
+
+            const getPriorityName = (priority) => {
+                const names = { baixa: 'Baixa', media: 'Média', alta: 'Alta', urgente: 'Urgente' };
+                return names[priority] || priority;
+            };
+
+            const getStatusName = (status) => {
+                const names = { pendente: 'Pendente', em_progresso: 'Em Progresso', concluida: 'Concluída' };
+                return names[status] || status;
+            };
+
+            if (loading) return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div></div>;
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-6">Gestão de Tarefas</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {tasks.map(task => (
+                            <div key={task.id} className="task-card">
+                                <h3 className="font-semibold text-gray-900 text-lg mb-2">{task.titulo}</h3>
+                                <p className="text-gray-600 text-sm mb-4">{task.descricao}</p>
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                    <span className={`priority-badge priority-${task.prioridade}`}>{getPriorityName(task.prioridade)}</span>
+                                    <span className={`status-badge status-${task.status}`}>{getStatusName(task.status)}</span>
+                                    <span className="category-badge">{getCategoryName(task.categoria)}</span>
+                                </div>
+                                {task.atribuido_a && (
+                                    <p className="text-sm text-gray-600 mb-3">
+                                        Atribuído a: {users.find(u => u.id === task.atribuido_a)?.nome}
+                                    </p>
+                                )}
+                                {task.data_vencimento && (
+                                    <p className="text-sm text-gray-600">
+                                        Vencimento: {new Date(task.data_vencimento).toLocaleDateString('pt-BR')}
+                                    </p>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // Project Manager
+        const ProjectManager = () => {
+            const [projects, setProjects] = useState([]);
+            const [selectedProject, setSelectedProject] = useState(null);
+            const [tasks, setTasks] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                fetchProjects();
+            }, []);
+
+            const fetchProjects = async () => {
+                try {
+                    const data = await mockAPI.getProjects();
+                    setProjects(data);
+                } catch (error) {
+                    console.error('Erro:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const fetchProjectTasks = async (projectId) => {
+                try {
+                    const data = await mockAPI.getTasks({ projeto_id: projectId });
+                    setTasks(data);
+                } catch (error) {
+                    console.error('Erro:', error);
+                }
+            };
+
+            const getTasksByStatus = (status) => tasks.filter(task => task.status === status);
+
+            if (loading) return <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div></div>;
+
+            if (selectedProject) {
+                return (
+                    <div>
+                        <div className="flex items-center mb-6">
+                            <button onClick={() => setSelectedProject(null)} className="mr-4 text-gray-600 hover:text-gray-800">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </button>
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-900">{selectedProject.nome}</h2>
+                                <p className="text-gray-600">{selectedProject.descricao}</p>
+                            </div>
+                        </div>
+
+                        <div className="flex space-x-6 overflow-x-auto pb-6">
+                            {['pendente', 'em_progresso', 'concluida'].map(status => (
+                                <div key={status} className="bg-gray-50 rounded-2xl p-4 min-w-80">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="font-semibold text-gray-900">
+                                            {status === 'pendente' ? 'Pendente' : status === 'em_progresso' ? 'Em Progresso' : 'Concluída'}
+                                        </h3>
+                                        <span className={`px-2 py-1 rounded-full text-sm font-medium ${
+                                            status === 'pendente' ? 'bg-yellow-100 text-yellow-700' :
+                                            status === 'em_progresso' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+                                        }`}>
+                                            {getTasksByStatus(status).length}
+                                        </span>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {getTasksByStatus(status).map(task => (
+                                            <div key={task.id} className="bg-white rounded-xl p-3 shadow-sm">
+                                                <h4 className="font-semibold text-gray-900 mb-2">{task.titulo}</h4>
+                                                <p className="text-sm text-gray-600 mb-3">{task.descricao}</p>
+                                                <span className={`priority-badge priority-${task.prioridade}`}>
+                                                    {task.prioridade}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-6">Gestão de Projetos</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {projects.map(project => (
+                            <div key={project.id} className="task-card cursor-pointer" onClick={() => {
+                                setSelectedProject(project);
+                                fetchProjectTasks(project.id);
+                            }}>
+                                <h3 className="font-semibold text-gray-900 text-lg mb-2">{project.nome}</h3>
+                                <p className="text-gray-600 text-sm mb-4">{project.descricao}</p>
+                                <div className="flex items-center justify-between">
+                                    <span className={`status-badge status-${project.status}`}>
+                                        {project.status === 'em_progresso' ? 'Em Progresso' : 'Pendente'}
+                                    </span>
+                                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // Dashboard Principal
+        const Dashboard = () => {
+            const { user, logout } = useAuth();
+            const [currentView, setCurrentView] = useState('dashboard');
+            const [stats, setStats] = useState(null);
+
+            useEffect(() => {
+                fetchStats();
+            }, []);
+
+            const fetchStats = async () => {
+                try {
+                    const data = await mockAPI.getDashboardStats();
+                    setStats(data);
+                } catch (error) {
+                    console.error('Erro:', error);
+                }
+            };
+
+            const renderContent = () => {
+                switch (currentView) {
+                    case 'tasks': return <TaskManager />;
+                    case 'projects': return <ProjectManager />;
+                    default: return <DashboardStats stats={stats} />;
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100">
+                    <header className="bg-white shadow-sm border-b border-gray-200">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                            <div className="flex justify-between items-center h-16">
+                                <div className="flex items-center">
+                                    <h1 className="text-2xl font-bold text-gray-900">Sistema de Manutenção - CELP</h1>
+                                    <span className="ml-3 px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">Demo GitHub Pages</span>
+                                </div>
+                                <div className="flex items-center space-x-4">
+                                    <span className="text-sm text-gray-600">{user?.nome} ({user?.cargo})</span>
+                                    <button onClick={logout} className="text-sm text-red-600 hover:text-red-800 font-medium">Sair</button>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                        <nav className="mb-8">
+                            <div className="flex space-x-4">
+                                {[
+                                    { key: 'dashboard', label: 'Dashboard', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+                                    { key: 'tasks', label: 'Tarefas', icon: 'M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
+                                    { key: 'projects', label: 'Projetos', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' }
+                                ].map(item => (
+                                    <button key={item.key} onClick={() => setCurrentView(item.key)} 
+                                            className={`nav-item ${currentView === item.key ? 'nav-item-active' : 'nav-item-inactive'}`}>
+                                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
+                                        </svg>
+                                        {item.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </nav>
+                        <main>{renderContent()}</main>
+                    </div>
+                </div>
+            );
+        };
+
+        // Componente principal
+        const App = () => {
+            const { user, loading } = useAuth();
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100 flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
+                    </div>
+                );
+            }
+
+            return user ? <Dashboard /> : <Login />;
+        };
+
+        // Render da aplicação
+        ReactDOM.render(
+            <AuthProvider>
+                <App />
+            </AuthProvider>,
+            document.getElementById('root')
+        );
+    </script>
+</body>
+</html>
