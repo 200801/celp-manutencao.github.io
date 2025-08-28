@@ -4,10 +4,90 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Manutenção - EPL</title>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js">
+// Botão de reset: apaga chaves locais e recarrega
+function resetSystem() {
+    try {
+        const keys = ['celp_users','celp_user','celp_token','celp_tasks','celp_projects'];
+        keys.forEach(k => localStorage.removeItem(k));
+        alert('Sistema limpo. A página vai recarregar.');
+        window.location.reload();
+    } catch (e) {
+        alert('Não foi possível limpar o armazenamento: ' + e.message);
+    }
+}
+
+    
+function handleResetConfirm() {
+    if (confirm('Isto vai apagar os dados locais (utilizadores, tarefas e projetos) deste navegador. Continuar?')) {
+        resetSystem();
+    }
+}
+
+    </script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js">
+// Botão de reset: apaga chaves locais e recarrega
+function resetSystem() {
+    try {
+        const keys = ['celp_users','celp_user','celp_token','celp_tasks','celp_projects'];
+        keys.forEach(k => localStorage.removeItem(k));
+        alert('Sistema limpo. A página vai recarregar.');
+        window.location.reload();
+    } catch (e) {
+        alert('Não foi possível limpar o armazenamento: ' + e.message);
+    }
+}
+
+    
+function handleResetConfirm() {
+    if (confirm('Isto vai apagar os dados locais (utilizadores, tarefas e projetos) deste navegador. Continuar?')) {
+        resetSystem();
+    }
+}
+
+    </script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js">
+// Botão de reset: apaga chaves locais e recarrega
+function resetSystem() {
+    try {
+        const keys = ['celp_users','celp_user','celp_token','celp_tasks','celp_projects'];
+        keys.forEach(k => localStorage.removeItem(k));
+        alert('Sistema limpo. A página vai recarregar.');
+        window.location.reload();
+    } catch (e) {
+        alert('Não foi possível limpar o armazenamento: ' + e.message);
+    }
+}
+
+    
+function handleResetConfirm() {
+    if (confirm('Isto vai apagar os dados locais (utilizadores, tarefas e projetos) deste navegador. Continuar?')) {
+        resetSystem();
+    }
+}
+
+    </script>
+    <script src="https://cdn.tailwindcss.com">
+// Botão de reset: apaga chaves locais e recarrega
+function resetSystem() {
+    try {
+        const keys = ['celp_users','celp_user','celp_token','celp_tasks','celp_projects'];
+        keys.forEach(k => localStorage.removeItem(k));
+        alert('Sistema limpo. A página vai recarregar.');
+        window.location.reload();
+    } catch (e) {
+        alert('Não foi possível limpar o armazenamento: ' + e.message);
+    }
+}
+
+    
+function handleResetConfirm() {
+    if (confirm('Isto vai apagar os dados locais (utilizadores, tarefas e projetos) deste navegador. Continuar?')) {
+        resetSystem();
+    }
+}
+
+    </script>
     <style>
         /* Estilos personalizados CELP - TEXTO SEMPRE PRETO */
         * {
@@ -149,29 +229,19 @@
 
         // API funcional completa
         const API = {
-            
-async login(email, senha) {
-                await new Promise(resolve => setTimeout(resolve, 300));
-                // Ler utilizadores guardados do storage
-                const users = StorageAPI.getUsers();
-                const user = users.find(u => u.email === email);
-                if (!user || !user.ativo) {
-                    throw new Error("Credenciais inválidas ou usuário inativo");
+            async login(email, senha) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                const cred = credentials[email];
+                if (cred && cred.senha === senha) {
+                    const users = StorageAPI.getUsers();
+                    const user = users.find(u => u.id === cred.userId);
+                    if (user && user.ativo) {
+                        return { access_token: `token-${Date.now()}`, user };
+                    }
                 }
-                // Validação de senha: usa a senha gravada no utilizador;
-                // se não existir (contas iniciais), valida contra o mapa 'credentials'
-                let senhaValida = false;
-                if (user.senha && user.senha.length > 0) {
-                    senhaValida = (user.senha === senha);
-                } else {
-                    const cred = credentials[email];
-                    senhaValida = !!cred && cred.senha === senha;
-                }
-                if (!senhaValida) {
-                    throw new Error("Credenciais inválidas ou usuário inativo");
-                }
-                return { access_token: `token-${Date.now()}`, user };
+                throw new Error("Credenciais inválidas ou usuário inativo");
             },
+
             async getUsers() {
                 return StorageAPI.getUsers().filter(u => u.ativo);
             },
@@ -197,22 +267,16 @@ async login(email, senha) {
                 return newUser;
             },
 
-            
-async updateUser(userId, updates) {
+            async updateUser(userId, updates) {
                 const users = StorageAPI.getUsers();
                 const index = users.findIndex(u => u.id === userId);
                 if (index === -1) throw new Error("Usuário não encontrado");
-
-                // Não sobrescrever a senha se vier vazia/indefinida
-                const safeUpdates = { ...updates };
-                if (!safeUpdates.senha) {
-                    delete safeUpdates.senha;
-                }
-
-                users[index] = { ...users[index], ...safeUpdates };
+                
+                users[index] = { ...users[index], ...updates };
                 StorageAPI.saveUsers(users);
                 return users[index];
             },
+
             async deleteUser(userId) {
                 const users = StorageAPI.getUsers();
                 const index = users.findIndex(u => u.id === userId);
@@ -453,7 +517,25 @@ async updateUser(userId, updates) {
                             <button type="submit" disabled={loading} className="w-full btn-primary">
                                 {loading ? 'Aguarde...' : 'Entrar'}
                             </button>
-                        </form></div>
+                        
+    <button
+        type="button"
+        onClick={resetSystem}
+        className="w-full btn-secondary mt-3"
+        title="Apaga dados locais (utilizadores/tarefas/projetos) e reinicia a app"
+    >
+        Resetar sistema
+    </button>
+</form>
+
+                        <div className="mt-6 p-4 bg-gray-50 rounded-xl">
+                            <h3 className="font-semibold mb-2">Credenciais de Teste:</h3>
+                            <div className="text-sm space-y-1">
+                                <p><strong>Chefe:</strong> admin@escola.com / admin123</p>
+                                <p><strong>Supervisor:</strong> joao@escola.com / 123456</p>
+                                <p><strong>Técnicos:</strong> maria@escola.com / 123456</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             );
@@ -1759,6 +1841,15 @@ async updateUser(userId, updates) {
                                     <button onClick={logout} className="text-sm text-red-600 hover:text-red-800 font-medium">
                                         Sair
                                     </button>
+
+<button
+    onClick={handleResetConfirm}
+    className="ml-2 btn-secondary"
+    title="Limpa dados locais e recarrega a aplicação"
+>
+    Resetar sistema
+</button>
+
                                 </div>
                             </div>
                         </div>
@@ -1809,6 +1900,25 @@ async updateUser(userId, updates) {
             </AuthProvider>,
             document.getElementById('root')
         );
+    
+// Botão de reset: apaga chaves locais e recarrega
+function resetSystem() {
+    try {
+        const keys = ['celp_users','celp_user','celp_token','celp_tasks','celp_projects'];
+        keys.forEach(k => localStorage.removeItem(k));
+        alert('Sistema limpo. A página vai recarregar.');
+        window.location.reload();
+    } catch (e) {
+        alert('Não foi possível limpar o armazenamento: ' + e.message);
+    }
+}
+
+    
+function handleResetConfirm() {
+    if (confirm('Isto vai apagar os dados locais (utilizadores, tarefas e projetos) deste navegador. Continuar?')) {
+        resetSystem();
+    }
+}
+
     </script>
 </body>
-</html>
