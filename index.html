@@ -1,6 +1,81 @@
-<!DOCTYPE html><html><head>
-    <meta charset="utf-8"/><script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    </head><body><script>
-    const supabase = window.supabase.createClient("https://padojgpykxphlrliphsh.supabase.co","eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhZG9qZ3B5a3hwaGxybGlwaHNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY0NDUyMjIsImV4cCI6MjA3MjAyMTIyMn0.nBc6gzba0tq2_65oV25v_pGBOCSduK6QMZtWxBDTLK0");
-    document.write('Config ok: ' + "https://padojgpykxphlrliphsh.supabase.co");
-    </script></body></html>
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Manutenção - EPL CELP</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+
+  <div class="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
+    <h1 class="text-2xl font-bold text-center mb-2">Sistema de Manutenção</h1>
+    <p class="text-center text-sm text-gray-600 mb-6">EPL - CELP<br>Ligado ao Supabase</p>
+
+    <!-- Login form -->
+    <form id="login-form" class="space-y-4">
+      <div>
+        <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+        <input id="email" type="email" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+      </div>
+      <div>
+        <label for="password" class="block text-sm font-medium text-gray-700">Senha</label>
+        <input id="password" type="password" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+      </div>
+      <button type="submit" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-lg hover:bg-indigo-700">
+        Entrar
+      </button>
+    </form>
+
+    <button id="reset-btn" class="mt-4 w-full bg-gray-300 text-black py-2 px-4 rounded-lg hover:bg-gray-400">
+      Resetar sistema
+    </button>
+
+    <p id="error-msg" class="text-red-500 text-center mt-4 hidden"></p>
+  </div>
+
+  <script>
+    // --- Configuração Supabase ---
+    const SUPABASE_URL = "https://padojgpykxphlrliphsh.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBhZG9qZ3B5a3hwaGxybGlwaHNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY0NDUyMjIsImV4cCI6MjA3MjAyMTIyMn0.nBc6gzba0tq2_65oV25v_pGBOCSduK6QMZtWxBDTLK0";
+
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const form = document.getElementById("login-form");
+    const errorMsg = document.getElementById("error-msg");
+    const resetBtn = document.getElementById("reset-btn");
+
+    // --- Login ---
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorMsg.classList.add("hidden");
+
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+      });
+
+      if (error) {
+        errorMsg.textContent = "Credenciais inválidas: " + error.message;
+        errorMsg.classList.remove("hidden");
+      } else {
+        window.location.href = "dashboard.html"; // redireciona para dashboard
+      }
+    });
+
+    // --- Botão Reset ---
+    resetBtn.addEventListener("click", () => {
+      localStorage.removeItem("celp_users");
+      localStorage.removeItem("celp_user");
+      localStorage.removeItem("celp_token");
+      localStorage.removeItem("celp_tasks");
+      localStorage.removeItem("celp_projects");
+      alert("Sistema resetado! Faça login novamente.");
+    });
+  </script>
+</body>
+</html>
