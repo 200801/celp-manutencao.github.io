@@ -277,35 +277,91 @@
       const [form,setForm]=useState({titulo:'',descricao:'',categoria:'eletrica',prioridade:'media',atribuido_a:'',projeto_id:'',status:'pendente',data_vencimento:''});
       const { profile } = useAuth(); const note = useNotification();
 
-      async function refresh(){ const [t,u,p]=await Promise.all([API.listTasks(),API.listUsers(),API.listProjects()]); setTasks(t); setUsers(u); setProjects(p); }
+      async function refresh(){
+        const [t,u,p]=await Promise.all([API.listTasks(),API.listUsers(),API.listProjects()]);
+        setTasks(t); setUsers(u); setProjects(p);
+      }
       useEffect(()=>{ refresh(); },[]);
+
+      // helper: "" -> null
+      const asNullable = (v) => (v === '' || v === undefined ? null : v);
 
       async function submit(e){
         e.preventDefault();
         try{
-          const payload={...form, criado_por: profile?.id||null};
-          if(editing){ await API.updateTask(editing.id,payload); note.show('Tarefa atualizada'); }
-          else{ await API.createTask(payload); note.show('Tarefa criada'); }
-          setOpen(false); setEditing(null); setForm({titulo:'',descricao:'',categoria:'eletrica',prioridade:'media',atribuido_a:'',projeto_id:'',status:'pendente',data_vencimento:''}); refresh();
-        }catch(err){ note.show(err.message,'err'); }
+          const payload={
+            titulo: form.titulo,
+            descricao: form.descricao,
+            categoria: form.categoria,
+            prioridade: form.prioridade,
+            atribuido_a: asNullable(form.atribuido_a),  // <- correção
+            projeto_id:  asNullable(form.projeto_id),   // <- correção
+            status: form.status,
+            data_vencimento: asNullable(form.data_vencimento), // <- correção
+            criado_por: profile?.id || null
+          };
+
+          if(editing){
+            await API.updateTask(editing.id,payload);
+            note.show('Tarefa atualizada');
+          }else{
+            await API.createTask(payload);
+            note.show('Tarefa criada');
+          }
+
+          setOpen(false); setEditing(null);
+          setForm({titulo:'',descricao:'',categoria:'eletrica',prioridade:'media',atribuido_a:'',projeto_id:'',status:'pendente',data_vencimento:''});
+          refresh();
+        }catch(err){
+          note.show(err.message,'err');
+        }
       }
-      async function remove(t){ if(confirm('Eliminar tarefa?')){ await API.deleteTask(t.id); note.show('Eliminada'); refresh(); } }
+
+      async function remove(t){
+        if(confirm('Eliminar tarefa?')){
+          await API.deleteTask(t.id); note.show('Eliminada'); refresh();
+        }
+      }
 
       return (
         <div className="bg-white rounded-2xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4"><h2 className="text-lg font-bold">Tarefas</h2><button className="btn btn-primary" onClick={()=>setOpen(true)}>Nova tarefa</button></div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold">Tarefas</h2>
+            <button className="btn btn-primary" onClick={()=>setOpen(true)}>Nova tarefa</button>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {tasks.map(t=>(
               <div key={t.id} className="task-card">
                 <div className="flex items-start justify-between">
                   <h3 className="font-semibold">{t.titulo}</h3>
                   <div className="space-x-2">
-                    <button className="btn btn-secondary" onClick={()=>{setEditing(t); setForm({titulo:t.titulo,descricao:t.descricao,categoria:t.categoria||'eletrica',prioridade:t.prioridade||'media',atribuido_a:t.atribuido_a||'',projeto_id:t.projeto_id||'',status:t.status||'pendente',data_vencimento:t.data_vencimento||''}); setOpen(true);}}>Editar</button>
+                    <button
+                      className="btn btn-secondary"
+                      onClick={()=>{
+                        setEditing(t);
+                        setForm({
+                          titulo:t.titulo||'',
+                          descricao:t.descricao||'',
+                          categoria:t.categoria||'eletrica',
+                          prioridade:t.prioridade||'media',
+                          atribuido_a:t.atribuido_a || '',
+                          projeto_id:t.projeto_id || '',
+                          status:t.status||'pendente',
+                          // garantir formato YYYY-MM-DD
+                          data_vencimento: t.data_vencimento ? t.data_vencimento.slice(0,10) : ''
+                        });
+                        setOpen(true);
+                      }}
+                    >Editar</button>
                     <button className="btn btn-danger" onClick={()=>remove(t)}>Apagar</button>
                   </div>
                 </div>
                 <p className="text-sm mt-1">{t.descricao}</p>
-                <div className="text-xs mt-2 space-x-2"><span className="px-2 py-1 bg-gray-100 rounded">{t.prioridade}</span><span className="px-2 py-1 bg-gray-100 rounded">{t.status}</span></div>
+                <div className="text-xs mt-2 space-x-2">
+                  <span className="px-2 py-1 bg-gray-100 rounded">{t.prioridade}</span>
+                  <span className="px-2 py-1 bg-gray-100 rounded">{t.status}</span>
+                </div>
                 {t.atribuido_a && <p className="text-sm mt-2"><b>Atribuído a:</b> {users.find(u=>u.id===t.atribuido_a)?.nome}</p>}
                 {t.projeto_id && <p className="text-sm"><b>Projeto:</b> {projects.find(p=>p.id===t.projeto_id)?.nome}</p>}
                 {t.data_vencimento && <p className="text-sm"><b>Vencimento:</b> {new Date(t.data_vencimento).toLocaleDateString('pt-PT')}</p>}
@@ -316,38 +372,68 @@
           {open && (
             <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
               <div className="bg-white rounded-2xl p-6 w-full max-w-lg">
-                <div className="flex items-center justify-between mb-3"><h3 className="font-semibold">{editing?'Editar tarefa':'Nova tarefa'}</h3><button onClick={()=>{setOpen(false); setEditing(null);}}>&times;</button></div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold">{editing?'Editar tarefa':'Nova tarefa'}</h3>
+                  <button onClick={()=>{setOpen(false); setEditing(null);}}>&times;</button>
+                </div>
                 <form onSubmit={submit} className="space-y-3">
-                  <div><label className="text-sm">Título</label><input className="form-input" value={form.titulo} onChange={e=>setForm({...form,titulo:e.target.value})} required /></div>
-                  <div><label className="text-sm">Descrição</label><textarea className="form-input" rows="3" value={form.descricao} onChange={e=>setForm({...form,descricao:e.target.value})} required></textarea></div>
+                  <div>
+                    <label className="text-sm">Título</label>
+                    <input className="form-input" value={form.titulo} onChange={e=>setForm({...form,titulo:e.target.value})} required />
+                  </div>
+                  <div>
+                    <label className="text-sm">Descrição</label>
+                    <textarea className="form-input" rows="3" value={form.descricao} onChange={e=>setForm({...form,descricao:e.target.value})} required></textarea>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3">
-                    <div><label className="text-sm">Categoria</label>
+                    <div>
+                      <label className="text-sm">Categoria</label>
                       <select className="form-select" value={form.categoria} onChange={e=>setForm({...form,categoria:e.target.value})}>
-                        <option value="eletrica">Elétrica</option><option value="canalizacao">Canalização</option><option value="ac">Ar Condicionado</option><option value="obras">Obras</option><option value="reparacoes_gerais">Reparações Gerais</option>
+                        <option value="eletrica">Elétrica</option>
+                        <option value="canalizacao">Canalização</option>
+                        <option value="ac">Ar Condicionado</option>
+                        <option value="obras">Obras</option>
+                        <option value="reparacoes_gerais">Reparações Gerais</option>
                       </select>
                     </div>
-                    <div><label className="text-sm">Prioridade</label>
+                    <div>
+                      <label className="text-sm">Prioridade</label>
                       <select className="form-select" value={form.prioridade} onChange={e=>setForm({...form,prioridade:e.target.value})}>
-                        <option value="baixa">Baixa</option><option value="media">Média</option><option value="alta">Alta</option><option value="urgente">Urgente</option>
+                        <option value="baixa">Baixa</option>
+                        <option value="media">Média</option>
+                        <option value="alta">Alta</option>
+                        <option value="urgente">Urgente</option>
                       </select>
                     </div>
                   </div>
+
                   <div className="grid grid-cols-2 gap-3">
-                    <div><label className="text-sm">Atribuir a</label>
+                    <div>
+                      <label className="text-sm">Atribuir a</label>
                       <select className="form-select" value={form.atribuido_a} onChange={e=>setForm({...form,atribuido_a:e.target.value})}>
                         <option value="">Não atribuído</option>
                         {users.map(u=><option key={u.id} value={u.id}>{u.nome} ({u.cargo})</option>)}
                       </select>
                     </div>
-                    <div><label className="text-sm">Projeto</label>
+                    <div>
+                      <label className="text-sm">Projeto</label>
                       <select className="form-select" value={form.projeto_id} onChange={e=>setForm({...form,projeto_id:e.target.value})}>
                         <option value="">Sem projeto</option>
                         {projects.map(p=><option key={p.id} value={p.id}>{p.nome}</option>)}
                       </select>
                     </div>
                   </div>
-                  <div><label className="text-sm">Data de vencimento</label><input type="date" className="form-input" value={form.data_vencimento} onChange={e=>setForm({...form,data_vencimento:e.target.value})} /></div>
-                  <div className="flex gap-2 pt-2"><button className="btn btn-primary flex-1" type="submit">{editing?'Atualizar':'Criar'}</button><button className="btn btn-secondary flex-1" type="button" onClick={()=>{setOpen(false); setEditing(null);}}>Cancelar</button></div>
+
+                  <div>
+                    <label className="text-sm">Data de vencimento</label>
+                    <input type="date" className="form-input" value={form.data_vencimento} onChange={e=>setForm({...form,data_vencimento:e.target.value})} />
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <button className="btn btn-primary flex-1" type="submit">{editing?'Atualizar':'Criar'}</button>
+                    <button className="btn btn-secondary flex-1" type="button" onClick={()=>{setOpen(false); setEditing(null);}}>Cancelar</button>
+                  </div>
                 </form>
               </div>
             </div>
@@ -468,4 +554,4 @@
     ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
   </script>
 </body>
-</html>
+</html> 
