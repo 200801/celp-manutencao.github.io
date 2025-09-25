@@ -58,51 +58,103 @@
     const AuthCtx = createContext();
     const useAuth = () => useContext(AuthCtx);
     function AuthProvider({children}){
-      const [user, setUser] = useState(null);
-      const [profile, setProfile] = useState(null);
-      const [loading, setLoading] = useState(true);
-      const note = useNotification();
+  const [user, setUser] = React.useState(null);
+  const [profile, setProfile] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const note = useNotification();
 
-      useEffect(() => {
-        (async () => {
-          const { data:{session} } = await supabase.auth.getSession();
-          if (session) {
-            setUser(session.user);
-            await loadProfile(session.user);
-          }
-          setLoading(false);
-        })();
+  async function loadProfile(authUser){
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', authUser.email.toLowerCase())
+        .limit(1);
 
-        const { data: sub } = supabase.auth.onAuthStateChange(async (ev, session) => {
-          if (ev === 'SIGNED_IN') {
-            setUser(session.user);
-            await loadProfile(session.user);
-          } else if (ev === 'SIGNED_OUT') {
-            setUser(null); setProfile(null);
-          }
-        });
-        return () => sub.subscription.unsubscribe();
-      }, []);
-
-      async function loadProfile(authUser){
-        const { data, error } = await supabase.from('users').select('*').eq('email', authUser.email).limit(1);
-        if (!error && data?.length) setProfile(data[0]);
+      if (!error && data?.length) {
+        setProfile(data[0]);
+        return;
       }
 
-      async function login(email, password){
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw new Error(error.message);
-        note.show('Sessão iniciada');
-      }
-      async function logout(){ await supabase.auth.signOut(); note.show('Sessão terminada'); }
+      // Fallback: criar perfil se não existir (evita “A carregar…” eterno)
+      const { data: ins, error: insErr } = await supabase
+        .from('users')
+        .insert([{
+          nome: authUser.email.split('@')[0],
+          email: authUser.email.toLowerCase(),
+          cargo: 'tecnico',
+          ativo: true,
+          auth_user_id: authUser.id
+        }])
+        .select()
+        .single();
 
-      return (
-        <AuthCtx.Provider value={{ user, profile, loading, login, logout, reloadProfile: loadProfile }}>
-          {children}
-        </AuthCtx.Provider>
-      );
+      if (!insErr) setProfile(ins);
+      else console.error('create profile error', insErr);
+    } catch (e) {
+      console.error('loadProfile error', e);
     }
+  }
 
+  React.useEffect(() => {
+    let cancelled = false;
+    const safety = setTimeout(() => {
+      if (!cancelled) {
+        console.warn('Auth bootstrap fallback timeout -> forcing UI');
+        setLoading(false);
+      }
+    }, 4000);
+
+    (async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) console.error('getSession error', error);
+        if (session) {
+          setUser(session.user);
+          await loadProfile(session.user);
+        }
+      } catch (e) {
+        console.error('bootstrap auth error', e);
+      } finally {
+        if (!cancelled) setLoading(false);
+        clearTimeout(safety);
+      }
+    })();
+
+    const { data: sub } = supabase.auth.onAuthStateChange(async (ev, session) => {
+      try {
+        if (ev === 'SIGNED_IN' && session?.user) {
+          setUser(session.user);
+          await loadProfile(session.user);
+        } else if (ev === 'SIGNED_OUT') {
+          setUser(null);
+          setProfile(null);
+        }
+      } catch (e) {
+        console.error('onAuthStateChange error', e);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(safety);
+      sub?.subscription?.unsubscribe?.();
+    };
+  }, []);
+
+  async function login(email, password){
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message);
+    note.show('Sessão iniciada');
+  }
+  async function logout(){ await supabase.auth.signOut(); note.show('Sessão terminada'); }
+
+  return (
+    <AuthCtx.Provider value={{ user, profile, loading, login, logout, reloadProfile: loadProfile }}>
+      {children}
+    </AuthCtx.Provider>
+  );
+}
     // ---- API ----
     const API = {
       async listUsers(){
