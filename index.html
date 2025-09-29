@@ -1,78 +1,251 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
-  <meta charset="UTF-8">
-  <title>Login - Sistema de Manutenção</title>
+  <meta charset="UTF-8" />
+  <title>Sistema de Manutenção</title>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <style>
-    body { font-family: Arial, sans-serif; background: #f9f9f9; padding: 2rem; }
-    .box { max-width: 400px; margin: auto; background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,.1); }
-    input { width: 100%; padding: 10px; margin: 10px 0; }
-    button { padding: 10px 15px; margin-top: 10px; }
-    .hidden { display: none; }
+    body { font-family: Arial, sans-serif; background:#f6f7fb; margin:0; }
+    header { display:flex; justify-content:space-between; align-items:center; padding:14px 18px; background:#ffffff; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+    .wrap { max-width:1000px; margin:30px auto; padding:0 16px; }
+    .card { background:#fff; border:1px solid #eaeaea; border-radius:12px; padding:18px; box-shadow:0 2px 8px rgba(0,0,0,.05); }
+    input, select, button { padding:10px; margin:8px 0; }
+    input, select { width:100%; border:1px solid #d8d8d8; border-radius:8px; }
+    button { border-radius:8px; background:#5b67f1; color:#fff; border:0; cursor:pointer; }
+    button.secondary { background:#fff; color:#333; border:1px solid #d8d8d8; }
+    table { width:100%; border-collapse:collapse; margin-top:10px; }
+    th, td { text-align:left; padding:10px; border-bottom:1px solid #eee; }
+    .hidden { display:none; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    @media (max-width:800px){ .row { grid-template-columns:1fr; } }
+    .tag { display:inline-block; padding:3px 8px; border-radius:999px; font-size:12px; border:1px solid #d8d8d8; background:#fafafa; }
+    .danger { background:linear-gradient(90deg,#ef4444,#ec4899); color:#fff; border:0; }
   </style>
 </head>
 <body>
+  <header>
+    <strong>Sistema de Manutenção</strong>
+    <div id="sessionBox" class="hidden">
+      <span id="who"></span>
+      <button class="secondary" onclick="logout()">Terminar sessão</button>
+    </div>
+  </header>
 
-  <div class="box" id="loginBox">
-    <h2>Iniciar Sessão</h2>
-    <input type="email" id="email" placeholder="Email" required />
-    <input type="password" id="password" placeholder="Senha" required />
-    <button onclick="login()">Entrar</button>
-    <p id="loginMsg"></p>
-  </div>
+  <div class="wrap">
 
-  <div class="box hidden" id="userBox">
-    <h2>Bem-vindo!</h2>
-    <p id="userEmail"></p>
-    <button onclick="logout()">Terminar Sessão</button>
+    <!-- LOGIN -->
+    <div id="loginCard" class="card">
+      <h2>Iniciar sessão</h2>
+      <div class="row">
+        <div>
+          <label>Email</label>
+          <input type="email" id="email" placeholder="email@exemplo.pt" />
+        </div>
+        <div>
+          <label>Senha</label>
+          <input type="password" id="password" placeholder="mínimo 8 caracteres" />
+        </div>
+      </div>
+      <button onclick="login()">Entrar</button>
+      <p id="loginMsg"></p>
+    </div>
+
+    <!-- DASHBOARD SIMPLES -->
+    <div id="dashCard" class="card hidden">
+      <h2>Bem-vindo</h2>
+      <p>
+        <b>Perfil:</b> <span id="cargo"></span> ·
+        <b>Nome:</b> <span id="nome"></span> ·
+        <b>Email:</b> <span id="emailShown"></span>
+      </p>
+      <p class="tag">Esta área só confirma o login. A gestão aparece em baixo se fores “chefe”.</p>
+    </div>
+
+    <!-- GESTÃO UTILIZADORES (só chefe) -->
+    <div id="adminCard" class="card hidden">
+      <h2>Utilizadores (só chefe)</h2>
+
+      <div class="row">
+        <div>
+          <h3>Novo utilizador</h3>
+          <label>Nome</label>
+          <input id="u_nome" placeholder="ex.: Ana Silva" />
+          <label>Email</label>
+          <input id="u_email" placeholder="ana@exemplo.pt" />
+          <label>Cargo</label>
+          <select id="u_cargo">
+            <option value="tecnico">Técnico</option>
+            <option value="supervisor">Supervisor</option>
+            <option value="chefe">Chefe</option>
+          </select>
+          <label>Senha provisória</label>
+          <input id="u_senha" type="password" placeholder="mínimo 8 caracteres" />
+          <button onclick="criarUtilizador()">Criar</button>
+          <p id="createMsg"></p>
+        </div>
+
+        <div>
+          <h3>Lista de utilizadores</h3>
+          <table>
+            <thead>
+              <tr><th>Nome</th><th>Email</th><th>Cargo</th><th>Ativo</th></tr>
+            </thead>
+            <tbody id="tblUsers"></tbody>
+          </table>
+          <button class="secondary" onclick="carregarUtilizadores()">Atualizar</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script>
-    // ⚙️ Configuração Supabase
+    // ⚙️ CONFIG SUPABASE
     const supabase = window.supabase.createClient(
-      "https://rdmnnwhllnixzntqgynx.supabase.co",  // substitui se necessário
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkbW5ud2hsbG5peHpudHFneW54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNTQzNjYsImV4cCI6MjA3NDczMDM2Nn0.qghuyBLXerVgVQ-i8SjufJ316_0sB-8qXsNPkbt-ack"    // a tua anon key
+      "https://rdmnnwhllnixzntqgynx.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkbW5ud2hsbG5peHpudHFneW54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNTQzNjYsImV4cCI6MjA3NDczMDM2Nn0.qghuyBLXerVgVQ-i8SjufJ316_0sB-8qXsNPkbt-ack"
     );
 
-    // Login
+    // Estado simples em memória
+    let sessionUser = null;   // supabase user
+    let myProfile   = null;   // linha da tabela public.users
+
+    // Helpers de UI
+    function show(id){ document.getElementById(id).classList.remove('hidden'); }
+    function hide(id){ document.getElementById(id).classList.add('hidden'); }
+
+    // LOGIN
     async function login() {
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password
-      });
-
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        document.getElementById('loginMsg').innerText = "Erro: " + error.message;
-      } else {
-        showUser(data.user);
+        document.getElementById('loginMsg').innerText = 'Erro: ' + error.message;
+        return;
       }
+      sessionUser = data.user;
+      await afterLogin();
     }
 
-    // Logout
+    // LOGOUT
     async function logout() {
       await supabase.auth.signOut();
-      document.getElementById('loginBox').classList.remove("hidden");
-      document.getElementById('userBox').classList.add("hidden");
+      sessionUser = null; myProfile = null;
+      hide('dashCard'); hide('adminCard'); hide('sessionBox');
+      show('loginCard');
     }
 
-    // Mostrar utilizador autenticado
-    function showUser(user) {
-      document.getElementById('loginBox').classList.add("hidden");
-      document.getElementById('userBox').classList.remove("hidden");
-      document.getElementById('userEmail').innerText = "Sessão iniciada como: " + user.email;
-    }
-
-    // Verificar sessão ao carregar
+    // Ao carregar a página, verificar sessão
     (async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
-        showUser(data.session.user);
+        sessionUser = data.session.user;
+        await afterLogin();
+      } else {
+        show('loginCard');
       }
     })();
+
+    // Depois do login: obter o meu perfil + montar UI
+    async function afterLogin() {
+      hide('loginCard'); show('sessionBox'); show('dashCard');
+      document.getElementById('who').innerText = sessionUser.email;
+
+      // buscar o meu perfil
+      const { data: me, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_user_id', sessionUser.id)
+        .maybeSingle();
+
+      if (error) {
+        alert('Erro ao ler perfil: ' + error.message);
+        return;
+      }
+      if (!me) {
+        // não existe perfil (falta inserir no passo B)
+        document.getElementById('cargo').innerText = '(sem perfil)';
+        document.getElementById('nome').innerText  = '-';
+        document.getElementById('emailShown').innerText = sessionUser.email;
+        hide('adminCard');
+        return;
+      }
+      myProfile = me;
+      document.getElementById('cargo').innerText = myProfile.cargo;
+      document.getElementById('nome').innerText  = myProfile.nome;
+      document.getElementById('emailShown').innerText = myProfile.email;
+
+      // Se sou "chefe", mostra administração e carrega lista
+      if (myProfile.cargo === 'chefe') {
+        show('adminCard');
+        carregarUtilizadores();
+      } else {
+        hide('adminCard');
+      }
+    }
+
+    // LISTA de utilizadores — apenas chefe (RLS garantirá)
+    async function carregarUtilizadores() {
+      const tbody = document.getElementById('tblUsers');
+      tbody.innerHTML = '<tr><td colspan="4">A carregar…</td></tr>';
+
+      const { data, error } = await supabase
+        .from('users')
+        .select('nome,email,cargo,ativo')
+        .order('nome', { ascending: true });
+
+      if (error) {
+        tbody.innerHTML = `<tr><td colspan="4">Erro: ${error.message}</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = (data || []).map(u => `
+        <tr>
+          <td>${u.nome}</td>
+          <td>${u.email}</td>
+          <td><span class="tag">${u.cargo}</span></td>
+          <td>${u.ativo ? 'Sim' : 'Não'}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="4">Sem utilizadores.</td></tr>';
+    }
+
+    // CRIAR utilizador — chefe cria conta no Auth e insere perfil
+    async function criarUtilizador() {
+      const nome  = document.getElementById('u_nome').value.trim();
+      const email = document.getElementById('u_email').value.trim();
+      const cargo = document.getElementById('u_cargo').value;
+      const senha = document.getElementById('u_senha').value;
+
+      const msg = document.getElementById('createMsg');
+      msg.innerText = 'A criar…';
+
+      if (!nome || !email || !senha) {
+        msg.innerText = 'Preenche nome, email e senha.';
+        return;
+      }
+
+      // 1) criar conta Auth
+      const { data: signup, error: e1 } = await supabase.auth.admin.createUser({
+        email, password: senha, email_confirm: true
+      });
+      if (e1) { msg.innerText = 'Erro (auth): ' + e1.message; return; }
+
+      const novoAuthId = signup.user?.id;
+
+      // 2) inserir perfil na nossa tabela
+      const { error: e2 } = await supabase
+        .from('users')
+        .insert([{ auth_user_id: novoAuthId, nome, email, cargo, ativo: true }]);
+
+      if (e2) { msg.innerText = 'Erro (perfil): ' + e2.message; return; }
+
+      msg.innerText = 'Utilizador criado com sucesso.';
+      document.getElementById('u_nome').value = '';
+      document.getElementById('u_email').value = '';
+      document.getElementById('u_senha').value = '';
+      document.getElementById('u_cargo').value = 'tecnico';
+      carregarUtilizadores();
+    }
   </script>
 </body>
 </html>
