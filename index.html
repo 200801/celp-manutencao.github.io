@@ -1,26 +1,78 @@
-<!doctype html>
-<html>
-  <head><meta charset="utf-8"><title>Supabase config check</title></head>
-  <body>
-    <h1>Config check</h1>
-    <div id="out">A testar…</div>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script>
-      const SUPABASE_URL = "https://rdmnnwhllnixzntqgynx.supabase.co";      // ⬅️ troca
-      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkbW5ud2hsbG5peHpudHFneW54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNTQzNjYsImV4cCI6MjA3NDczMDM2Nn0.qghuyBLXerVgVQ-i8SjufJ316_0sB-8qXsNPkbt-ack";           // ⬅️ troca
-      const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <title>Login - Sistema de Manutenção</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f9f9f9; padding: 2rem; }
+    .box { max-width: 400px; margin: auto; background: #fff; padding: 2rem; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,.1); }
+    input { width: 100%; padding: 10px; margin: 10px 0; }
+    button { padding: 10px 15px; margin-top: 10px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
 
-      (async () => {
-        try {
-          const { data, error } = await sb.from('users').select('id,email,cargo').limit(1);
-          if (error) throw error;
-          document.getElementById('out').textContent = 'Config OK. Consegui falar com a BD.';
-          console.log('Sample users:', data);
-        } catch (e) {
-          document.getElementById('out').textContent = 'Falhou: ' + e.message;
-          console.error(e);
-        }
-      })();
-    </script>
-  </body>
+  <div class="box" id="loginBox">
+    <h2>Iniciar Sessão</h2>
+    <input type="email" id="email" placeholder="Email" required />
+    <input type="password" id="password" placeholder="Senha" required />
+    <button onclick="login()">Entrar</button>
+    <p id="loginMsg"></p>
+  </div>
+
+  <div class="box hidden" id="userBox">
+    <h2>Bem-vindo!</h2>
+    <p id="userEmail"></p>
+    <button onclick="logout()">Terminar Sessão</button>
+  </div>
+
+  <script>
+    // ⚙️ Configuração Supabase
+    const supabase = window.supabase.createClient(
+      "https://rdmnnwhllnixzntqgynx.supabase.co",  // substitui se necessário
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkbW5ud2hsbG5peHpudHFneW54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNTQzNjYsImV4cCI6MjA3NDczMDM2Nn0.qghuyBLXerVgVQ-i8SjufJ316_0sB-8qXsNPkbt-ack"    // a tua anon key
+    );
+
+    // Login
+    async function login() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password
+      });
+
+      if (error) {
+        document.getElementById('loginMsg').innerText = "Erro: " + error.message;
+      } else {
+        showUser(data.user);
+      }
+    }
+
+    // Logout
+    async function logout() {
+      await supabase.auth.signOut();
+      document.getElementById('loginBox').classList.remove("hidden");
+      document.getElementById('userBox').classList.add("hidden");
+    }
+
+    // Mostrar utilizador autenticado
+    function showUser(user) {
+      document.getElementById('loginBox').classList.add("hidden");
+      document.getElementById('userBox').classList.remove("hidden");
+      document.getElementById('userEmail').innerText = "Sessão iniciada como: " + user.email;
+    }
+
+    // Verificar sessão ao carregar
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        showUser(data.session.user);
+      }
+    })();
+  </script>
+</body>
 </html>
