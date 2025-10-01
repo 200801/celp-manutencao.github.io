@@ -26,18 +26,26 @@
 <script type="text/babel">
 const {useState,useEffect,createContext,useContext} = React;
 
-// 1) CONFIG SUPABASE  ---------------------------------------
-const SUPABASE_URL = "https://rdmnnwhllnixzntqgynx.supabase.co";          // <— TROCAR
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkbW5ud2hsbG5peHpudHFneW54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNTQzNjYsImV4cCI6MjA3NDczMDM2Nn0.qghuyBLXerVgVQ-i8SjufJ316_0sB-8qXsNPkbt-ack";                      // <— TROCAR
+/* ============================================================
+   1) CONFIG SUPABASE
+   ============================================================ */
+const SUPABASE_URL = "https://rdmnnwhllnixzntqgynx.supabase.co";          // <— CONFIRMAR
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJkbW5ud2hsbG5peHpudHFneW54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkxNTQzNjYsImV4cCI6MjA3NDczMDM2Nn0.qghuyBLXerVgVQ-i8SjufJ316_0sB-8qXsNPkbt-ack"; // <— CONFIRMAR
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// 2) Notificações simples  -----------------------------------
+/* ============================================================
+   2) Notificações simples
+   ============================================================ */
 const NoteCtx = createContext();
 const useNote = () => useContext(NoteCtx);
 function NoteProvider({children}){
   const [msg,setMsg]=useState(null);
   return (
-    <NoteCtx.Provider value={{ok:(t)=>setMsg({t,ok:true}), err:(t)=>setMsg({t,ok:false}), hide:()=>setMsg(null)}}>
+    <NoteCtx.Provider value={{
+      ok:(t)=>setMsg({t,ok:true}),
+      err:(t)=>setMsg({t,ok:false}),
+      hide:()=>setMsg(null)
+    }}>
       {children}
       {msg && <div className="alert">
         <div className="flex items-center gap-3">
@@ -49,13 +57,15 @@ function NoteProvider({children}){
   );
 }
 
-// 3) Auth + Perfil  ------------------------------------------
+/* ============================================================
+   3) Auth + Perfil
+   ============================================================ */
 const AuthCtx = createContext();
 const useAuth = () => useContext(AuthCtx);
 
 async function fetchMyProfile(authUser){
-  // obtém o registo do utilizador em public.users
-  const {data, error} = await supabase.from('users')
+  const {data, error} = await supabase
+    .from('users')
     .select('*')
     .eq('email', authUser.email)
     .limit(1);
@@ -69,21 +79,30 @@ function AuthProvider({children}){
   const [loading,setLoading]=useState(true);
   const note = useNote();
 
-  useEffect(()=>{(async()=>{
-    const {data:{session}} = await supabase.auth.getSession();
-    if(session?.user){
-      setUser(session.user);
-      try{ setProfile(await fetchMyProfile(session.user)); }catch(e){}
-    }
-    setLoading(false);
-  })();
-  const {data:sub}=supabase.auth.onAuthStateChange(async (_evt,session)=>{
-    if(session?.user){
-      setUser(session.user);
-      try{ setProfile(await fetchMyProfile(session.user)); }catch(e){}
-    } else { setUser(null); setProfile(null); }
-  });
-  return ()=>sub.subscription?.unsubscribe();
+  useEffect(()=>{
+    let unsub = null;
+
+    (async()=>{
+      const {data:{session}} = await supabase.auth.getSession();
+      if(session?.user){
+        setUser(session.user);
+        try{ setProfile(await fetchMyProfile(session.user)); }catch(e){}
+      }
+      setLoading(false);
+    })();
+
+    const sub = supabase.auth.onAuthStateChange(async (_evt,session)=>{
+      if(session?.user){
+        setUser(session.user);
+        try{ setProfile(await fetchMyProfile(session.user)); }catch(e){}
+      } else {
+        setUser(null);
+        setProfile(null);
+      }
+    });
+    unsub = () => sub.data.subscription?.unsubscribe();
+
+    return ()=>{ if(unsub) unsub(); };
   },[]);
 
   async function login(email,password){
@@ -92,27 +111,34 @@ function AuthProvider({children}){
     note.ok("Sessão iniciada");
   }
   async function logout(){
-    await supabase.auth.signOut(); note.ok("Sessão terminada");
+    await supabase.auth.signOut();
+    note.ok("Sessão terminada");
   }
 
-  return <AuthCtx.Provider value={{user,profile,loading,login,logout,setProfile}}>
-    {children}
-  </AuthCtx.Provider>;
+  return (
+    <AuthCtx.Provider value={{user,profile,loading,login,logout,setProfile}}>
+      {children}
+    </AuthCtx.Provider>
+  );
 }
 
-// 4) API helpers  --------------------------------------------
-const API={
+/* ============================================================
+   4) API helpers  (CORRIGIDO: tudo com vírgulas e funções válidas)
+   ============================================================ */
+const API = {
   // users ativos (para “Atribuir a”)
-  async listActiveUsers(){
-    const {data,error}=await supabase.from('users')
+  listActiveUsers: async () => {
+    const {data,error} = await supabase
+      .from('users')
       .select('id,nome,email,cargo,ativo')
       .eq('ativo',true)
       .order('nome');
     if(error) throw error;
     return data||[];
   },
-    // GERIR UTILIZADORES (só chefe)
-  async function createUser({nome, email, cargo, senha}) {
+
+  // GERIR UTILIZADORES (só chefe)
+  createUser: async ({nome, email, cargo, senha}) => {
     // 1) criar conta de autenticação
     const { data:sign, error:authErr } = await supabase.auth.signUp({
       email, password: senha,
@@ -122,50 +148,131 @@ const API={
 
     // 2) registar no perfil (users)
     const authId = sign?.user?.id || null;
-    const ins = await supabase.from('users')
+    const ins = await supabase
+      .from('users')
       .insert([{ nome, email, cargo, ativo: true, auth_user_id: authId }])
-      .select().single();
+      .select()
+      .single();
     if (ins.error) throw ins.error;
     return ins.data;
-  }
-  async function updateUser(id, updates) {
+  },
+
+  updateUser: async (id, updates) => {
     const u = { ...updates };
     delete u.senha; // nunca guardamos senha na tabela
-    const { data, error } = await supabase.from('users')
-      .update(u).eq('id', id).select().single();
-    if (error) throw error; return data;
-  }
-  async function deactivateUser(id, ativo=false) {
-    const { error } = await supabase.from('users').update({ ativo }).eq('id', id);
-    if (error) throw error; return true;
-  }
-  async function sendResetPassword(email) {
+    const { data, error } = await supabase
+      .from('users')
+      .update(u)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  deactivateUser: async (id, ativo=false) => {
+    const { error } = await supabase
+      .from('users')
+      .update({ ativo })
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  },
+
+  sendResetPassword: async (email) => {
     const { error } = await supabase.auth.resetPasswordForEmail(
       email, { redirectTo: window.location.href }
     );
-    if (error) throw error; return true;
+    if (error) throw error;
+    return true;
   },
+
   // tasks
-  async listTasks(filters={}){
-    let q=supabase.from('tasks').select('*').order('created_at',{ascending:false});
-    if(filters.status) q=q.eq('status',filters.status);
-    if(filters.projeto_id) q=q.eq('projeto_id',filters.projeto_id);
-    if(filters.atribuido_a) q=q.eq('atribuido_a',filters.atribuido_a);
-    const {data,error}=await q;
-    if(error) throw error; return data||[];
+  listTasks: async (filters={}) => {
+    let q = supabase
+      .from('tasks')
+      .select('*')
+      .order('created_at',{ascending:false});
+    if(filters.status) q = q.eq('status',filters.status);
+    if(filters.projeto_id) q = q.eq('projeto_id',filters.projeto_id);
+    if(filters.atribuido_a) q = q.eq('atribuido_a',filters.atribuido_a);
+    const {data,error} = await q;
+    if(error) throw error;
+    return data||[];
   },
-  async createTask(p){ const {data,error}=await supabase.from('tasks').insert([p]).select().single(); if(error) throw error; return data; },
-  async updateTask(id,u){ const {data,error}=await supabase.from('tasks').update(u).eq('id',id).select().single(); if(error) throw error; return data; },
-  async deleteTask(id){ const {error}=await supabase.from('tasks').delete().eq('id',id); if(error) throw error; },
+
+  createTask: async (p) => {
+    const {data,error} = await supabase
+      .from('tasks')
+      .insert([p])
+      .select()
+      .single();
+    if(error) throw error;
+    return data;
+  },
+
+  updateTask: async (id,u) => {
+    const {data,error} = await supabase
+      .from('tasks')
+      .update(u)
+      .eq('id',id)
+      .select()
+      .single();
+    if(error) throw error;
+    return data;
+  },
+
+  deleteTask: async (id) => {
+    const {error} = await supabase
+      .from('tasks')
+      .delete()
+      .eq('id',id);
+    if(error) throw error;
+  },
 
   // projects
-  async listProjects(){ const {data,error}=await supabase.from('projects').select('*').order('created_at',{ascending:false}); if(error) throw error; return data||[]; },
-  async createProject(p){ const {data,error}=await supabase.from('projects').insert([p]).select().single(); if(error) throw error; return data; },
-  async updateProject(id,u){ const {data,error}=await supabase.from('projects').update(u).eq('id',id).select().single(); if(error) throw error; return data; },
-  async deleteProject(id){ const {error}=await supabase.from('projects').delete().eq('id',id); if(error) throw error; },
+  listProjects: async () => {
+    const {data,error} = await supabase
+      .from('projects')
+      .select('*')
+      .order('created_at',{ascending:false});
+    if(error) throw error;
+    return data||[];
+  },
+
+  createProject: async (p) => {
+    const {data,error} = await supabase
+      .from('projects')
+      .insert([p])
+      .select()
+      .single();
+    if(error) throw error;
+    return data;
+  },
+
+  updateProject: async (id,u) => {
+    const {data,error} = await supabase
+      .from('projects')
+      .update(u)
+      .eq('id',id)
+      .select()
+      .single();
+    if(error) throw error;
+    return data;
+  },
+
+  deleteProject: async (id) => {
+    const {error} = await supabase
+      .from('projects')
+      .delete()
+      .eq('id',id);
+    if(error) throw error;
+  },
 };
 
-// 5) Componentes UI  -----------------------------------------
+/* ============================================================
+   5) Componentes UI
+   ============================================================ */
 function TopBar(){
   const {user,profile,logout}=useAuth();
   return (
@@ -176,7 +283,14 @@ function TopBar(){
           <p className="text-sm text-gray-600">EPL - CELP</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm">{profile?.nome || user?.email} {profile?.cargo && <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">{profile.cargo}</span>}</span>
+          <span className="text-sm">
+            {profile?.nome || user?.email}
+            {profile?.cargo && (
+              <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">
+                {profile.cargo}
+              </span>
+            )}
+          </span>
           <button className="btn btn-danger" onClick={logout}>Terminar sessão</button>
         </div>
       </div>
@@ -224,7 +338,6 @@ function Tasks(){
     try{
       const [u,p] = await Promise.all([API.listActiveUsers(), API.listProjects()]);
       setUsers(u); setProjects(p);
-      // técnicos: vêem só atribuídas (RLS também garante, mas filtramos aqui para UX)
       const myFilter = !isManager ? {atribuido_a: profile?.id} : {};
       setTasks(await API.listTasks(myFilter));
     }catch(e){ note.err(e.message); }
@@ -254,12 +367,16 @@ function Tasks(){
           <div className="flex items-start justify-between">
             <h3 className="font-semibold">{t.titulo}</h3>
             {isManager && <div className="space-x-2">
-              <button className="btn btn-secondary" onClick={()=>{setEditing(t); setForm({
-                titulo:t.titulo, descricao:t.descricao||'', categoria:t.categoria||'eletrica',
-                prioridade:t.prioridade||'media', status:t.status||'pendente',
-                data_vencimento:t.data_vencimento||'', atribuido_a:t.atribuido_a||'',
-                projeto_id:t.projeto_id||''
-              }); setOpen(true);}}>Editar</button>
+              <button className="btn btn-secondary" onClick={()=>{
+                setEditing(t);
+                setForm({
+                  titulo:t.titulo, descricao:t.descricao||'', categoria:t.categoria||'eletrica',
+                  prioridade:t.prioridade||'media', status:t.status||'pendente',
+                  data_vencimento:t.data_vencimento||'', atribuido_a:t.atribuido_a||'',
+                  projeto_id:t.projeto_id||''
+                });
+                setOpen(true);
+              }}>Editar</button>
               <button className="btn btn-danger" onClick={()=>remove(t)}>Apagar</button>
             </div>}
           </div>
@@ -378,10 +495,14 @@ function Projects(){
           <div className="flex items-start justify-between">
             <h3 className="font-semibold">{p.nome}</h3>
             {isManager && <div className="space-x-2">
-              <button className="btn btn-secondary" onClick={()=>{setEditing(p); setForm({
-                nome:p.nome, descricao:p.descricao||'', status:p.status||'pendente',
-                data_inicio:p.data_inicio||'', data_fim:p.data_fim||''
-              }); setOpen(true);}}>Editar</button>
+              <button className="btn btn-secondary" onClick={()=>{
+                setEditing(p);
+                setForm({
+                  nome:p.nome, descricao:p.descricao||'', status:p.status||'pendente',
+                  data_inicio:p.data_inicio||'', data_fim:p.data_fim||''
+                });
+                setOpen(true);
+              }}>Editar</button>
               <button className="btn btn-danger" onClick={()=>remove(p)}>Apagar</button>
             </div>}
           </div>
@@ -428,6 +549,7 @@ function Projects(){
     </div>
   );
 }
+
 function Users(){
   const { profile } = useAuth();
   const note = useNote();
@@ -441,7 +563,8 @@ function Users(){
 
   async function refresh(){
     try{
-      const { data, error } = await supabase.from('users')
+      const { data, error } = await supabase
+        .from('users')
         .select('id,nome,email,cargo,ativo')
         .order('nome');
       if (error) throw error;
@@ -504,7 +627,10 @@ function Users(){
                 <td className="p-2">{u.cargo}</td>
                 <td className="p-2">{u.ativo ? 'Sim' : 'Não'}</td>
                 <td className="p-2 space-x-2">
-                  <button className="btn btn-secondary" onClick={()=>{ setEditing(u); setForm({nome:u.nome,email:u.email,cargo:u.cargo,senha:''}); setOpen(true); }}>Editar</button>
+                  <button className="btn btn-secondary"
+                    onClick={()=>{ setEditing(u); setForm({nome:u.nome,email:u.email,cargo:u.cargo,senha:''}); setOpen(true); }}>
+                    Editar
+                  </button>
                   <button className="btn btn-secondary" onClick={()=>resetPwd(u)}>Reset password</button>
                   <button className="btn btn-danger" onClick={()=>toggleAtivo(u)}>{u.ativo?'Desativar':'Ativar'}</button>
                 </td>
@@ -525,7 +651,9 @@ function Users(){
               <div><label className="text-sm">Nome</label>
                 <input className="input" value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})} required/></div>
               <div><label className="text-sm">Email</label>
-                <input type="email" className="input" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} required disabled={!!editing}/></div>
+                <input type="email" className="input" value={form.email}
+                       onChange={e=>setForm({...form,email:e.target.value})}
+                       required disabled={!!editing}/></div>
               <div><label className="text-sm">Cargo</label>
                 <select className="select" value={form.cargo} onChange={e=>setForm({...form,cargo:e.target.value})}>
                   <option value="tecnico">Técnico</option>
@@ -534,7 +662,8 @@ function Users(){
                 </select></div>
               {!editing && (
                 <div><label className="text-sm">Senha provisória</label>
-                  <input type="password" className="input" value={form.senha} onChange={e=>setForm({...form,senha:e.target.value})} required/></div>
+                  <input type="password" className="input" value={form.senha}
+                         onChange={e=>setForm({...form,senha:e.target.value})} required/></div>
               )}
               <div className="flex gap-2 pt-2">
                 <button className="btn btn-primary flex-1" type="submit">{editing?'Atualizar':'Criar'}</button>
@@ -551,10 +680,17 @@ function Users(){
 function Login(){
   const {login}=useAuth();
   const note=useNote();
-  const [email,setEmail]=useState(""); const [pwd,setPwd]=useState(""); const [busy,setBusy]=useState(false);
-  async function submit(e){ e.preventDefault(); setBusy(true);
-    try{ await login(email,pwd); }catch(err){ note.err(err.message); } setBusy(false);
+  const [email,setEmail]=useState("");
+  const [pwd,setPwd]=useState("");
+  const [busy,setBusy]=useState(false);
+
+  async function submit(e){
+    e.preventDefault(); setBusy(true);
+    try{ await login(email,pwd); }
+    catch(err){ note.err(err.message); }
+    setBusy(false);
   }
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
@@ -563,8 +699,10 @@ function Login(){
           <p className="text-sm">EPL - CELP</p>
         </div>
         <form onSubmit={submit} className="space-y-4">
-          <div><label className="text-sm">Email</label><input type="email" className="input" value={email} onChange={e=>setEmail(e.target.value)} required/></div>
-          <div><label className="text-sm">Senha</label><input type="password" className="input" value={pwd} onChange={e=>setPwd(e.target.value)} required/></div>
+          <div><label className="text-sm">Email</label>
+            <input type="email" className="input" value={email} onChange={e=>setEmail(e.target.value)} required/></div>
+          <div><label className="text-sm">Senha</label>
+            <input type="password" className="input" value={pwd} onChange={e=>setPwd(e.target.value)} required/></div>
           <button className="btn btn-primary w-full" disabled={busy}>{busy?'A entrar…':'Entrar'}</button>
         </form>
       </div>
@@ -582,13 +720,13 @@ function App(){
       <TopBar/>
       <div className="max-w-6xl mx-auto px-4 py-6">
         <div className="flex gap-2 mb-6">
-  <button className={"btn btn-secondary "+(tab==='dashboard'?'border-purple-400 bg-purple-50':'')} onClick={()=>setTab('dashboard')}>Dashboard</button>
-  <button className={"btn btn-secondary "+(tab==='tasks'?'border-purple-400 bg-purple-50':'')} onClick={()=>setTab('tasks')}>Tarefas</button>
-  <button className={"btn btn-secondary "+(tab==='projects'?'border-purple-400 bg-purple-50':'')} onClick={()=>setTab('projects')}>Projetos</button>
-  {profile?.cargo==='chefe' && (
-    <button className={"btn btn-secondary "+(tab==='users'?'border-purple-400 bg-purple-50':'')} onClick={()=>setTab('users')}>Utilizadores</button>
-  )}
-</div>
+          <button className={"btn btn-secondary "+(tab==='dashboard'?'border-purple-400 bg-purple-50':'')} onClick={()=>setTab('dashboard')}>Dashboard</button>
+          <button className={"btn btn-secondary "+(tab==='tasks'?'border-purple-400 bg-purple-50':'')} onClick={()=>setTab('tasks')}>Tarefas</button>
+          <button className={"btn btn-secondary "+(tab==='projects'?'border-purple-400 bg-purple-50':'')} onClick={()=>setTab('projects')}>Projetos</button>
+          {profile?.cargo==='chefe' && (
+            <button className={"btn btn-secondary "+(tab==='users'?'border-purple-400 bg-purple-50':'')} onClick={()=>setTab('users')}>Utilizadores</button>
+          )}
+        </div>
         {tab==='dashboard' && <Dashboard/>}
         {tab==='tasks' && <Tasks/>}
         {tab==='projects' && <Projects/>}
@@ -598,7 +736,9 @@ function App(){
   );
 }
 
-// 6) Render  --------------------------------------------------
+/* ============================================================
+   6) Render
+   ============================================================ */
 const Root=()=>(
   <NoteProvider>
     <AuthProvider>
