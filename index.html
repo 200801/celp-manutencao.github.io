@@ -111,6 +111,40 @@ const API={
     if(error) throw error;
     return data||[];
   },
+    // GERIR UTILIZADORES (só chefe)
+  async function createUser({nome, email, cargo, senha}) {
+    // 1) criar conta de autenticação
+    const { data:sign, error:authErr } = await supabase.auth.signUp({
+      email, password: senha,
+      options: { emailRedirectTo: window.location.href }
+    });
+    if (authErr) throw authErr;
+
+    // 2) registar no perfil (users)
+    const authId = sign?.user?.id || null;
+    const ins = await supabase.from('users')
+      .insert([{ nome, email, cargo, ativo: true, auth_user_id: authId }])
+      .select().single();
+    if (ins.error) throw ins.error;
+    return ins.data;
+  }
+  async function updateUser(id, updates) {
+    const u = { ...updates };
+    delete u.senha; // nunca guardamos senha na tabela
+    const { data, error } = await supabase.from('users')
+      .update(u).eq('id', id).select().single();
+    if (error) throw error; return data;
+  }
+  async function deactivateUser(id, ativo=false) {
+    const { error } = await supabase.from('users').update({ ativo }).eq('id', id);
+    if (error) throw error; return true;
+  }
+  async function sendResetPassword(email) {
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      email, { redirectTo: window.location.href }
+    );
+    if (error) throw error; return true;
+  },
   // tasks
   async listTasks(filters={}){
     let q=supabase.from('tasks').select('*').order('created_at',{ascending:false});
