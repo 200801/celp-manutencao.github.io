@@ -79,31 +79,51 @@ function AuthProvider({children}){
   const [loading,setLoading]=useState(true);
   const note = useNote();
 
-  useEffect(()=>{
-    let unsub = null;
+  useEffect(() => {
+  // garante que nunca ficamos presos
+  let unsub = null;
 
-    (async()=>{
-      const {data:{session}} = await supabase.auth.getSession();
-      if(session?.user){
+  (async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
         setUser(session.user);
-        try{ setProfile(await fetchMyProfile(session.user)); }catch(e){}
+        try {
+          const p = await fetchMyProfile(session.user);
+          setProfile(p);
+        } catch (e) {
+          console.error('fetchMyProfile failed:', e);
+        }
       }
+    } catch (e) {
+      console.error('getSession failed:', e);
+    } finally {
+      // mesmo que dê erro, libertamos o loading
       setLoading(false);
-    })();
+    }
+  })();
 
-    const sub = supabase.auth.onAuthStateChange(async (_evt,session)=>{
-      if(session?.user){
+  const listener = supabase.auth.onAuthStateChange(async (_evt, session) => {
+    try {
+      if (session?.user) {
         setUser(session.user);
-        try{ setProfile(await fetchMyProfile(session.user)); }catch(e){}
+        try {
+          const p = await fetchMyProfile(session.user);
+          setProfile(p);
+        } catch (e) {
+          console.error('fetchMyProfile (listener) failed:', e);
+        }
       } else {
         setUser(null);
         setProfile(null);
       }
-    });
-    unsub = () => sub.data.subscription?.unsubscribe();
-
-    return ()=>{ if(unsub) unsub(); };
-  },[]);
+    } catch (e) {
+      console.error('onAuthStateChange handler failed:', e);
+    }
+  });
+  unsub = () => listener.data?.subscription?.unsubscribe?.();
+  return () => { try { unsub?.(); } catch {} };
+}, []);
 
   async function login(email,password){
     const {error} = await supabase.auth.signInWithPassword({email,password});
