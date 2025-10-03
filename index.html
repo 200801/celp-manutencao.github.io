@@ -73,70 +73,82 @@ async function fetchMyProfile(authUser){
   return data?.[0] || null;
 }
 
-function AuthProvider({children}){
-  const [user,setUser]=useState(null);
-  const [profile,setProfile]=useState(null);
-  const [loading,setLoading]=useState(true);
+function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
   const note = useNote();
 
   useEffect(() => {
-  // garante que nunca ficamos presos
-  let unsub = null;
-
-  (async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        try {
-          const p = await fetchMyProfile(session.user);
-          setProfile(p);
-        } catch (e) {
-          console.error('fetchMyProfile failed:', e);
-        }
+    let unsub = () => {};
+    let finished = false;
+    const finish = () => {
+      if (!finished) {
+        finished = true;
+        setLoading(false);
       }
-    } catch (e) {
-      console.error('getSession failed:', e);
-    } finally {
-      // mesmo que dê erro, libertamos o loading
-      setLoading(false);
-    }
-  })();
+    };
 
-  const listener = supabase.auth.onAuthStateChange(async (_evt, session) => {
-    try {
+    // 1) sessão atual (se já existe login guardado)
+    supabase.auth.getSession()
+      .then(async ({ data: { session } }) => {
+        if (session?.user) {
+          setUser(session.user);
+          try {
+            const p = await fetchMyProfile(session.user);
+            setProfile(p);
+          } catch (e) {
+            console.error(e);
+            note?.err?.("Não foi possível carregar o perfil.");
+          }
+        }
+      })
+      .catch((e) => {
+        console.error("getSession() falhou:", e);
+        note?.err?.("Não consegui contactar o Supabase (getSession).");
+      })
+      .finally(finish);
+
+    // 2) listener para mudanças de auth (login/logout)
+    const sub = supabase.auth.onAuthStateChange(async (_evt, session) => {
       if (session?.user) {
         setUser(session.user);
         try {
           const p = await fetchMyProfile(session.user);
           setProfile(p);
         } catch (e) {
-          console.error('fetchMyProfile (listener) failed:', e);
+          console.error(e);
+          note?.err?.("Não foi possível carregar o perfil.");
         }
       } else {
         setUser(null);
         setProfile(null);
       }
-    } catch (e) {
-      console.error('onAuthStateChange handler failed:', e);
-    }
-  });
-  unsub = () => listener.data?.subscription?.unsubscribe?.();
-  return () => { try { unsub?.(); } catch {} };
-}, []);
+    });
+    unsub = () => sub?.data?.subscription?.unsubscribe?.();
 
-  async function login(email,password){
-    const {error} = await supabase.auth.signInWithPassword({email,password});
-    if(error) throw error;
+    // 3) *safety timeout* — se nada responder em 2.5s, mostramos login
+    const t = setTimeout(finish, 2500);
+
+    return () => {
+      clearTimeout(t);
+      unsub();
+    };
+  }, []);
+
+  async function login(email, password) {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
     note.ok("Sessão iniciada");
   }
-  async function logout(){
+
+  async function logout() {
     await supabase.auth.signOut();
     note.ok("Sessão terminada");
   }
 
   return (
-    <AuthCtx.Provider value={{user,profile,loading,login,logout,setProfile}}>
+    <AuthCtx.Provider value={{ user, profile, loading, login, logout, setProfile }}>
       {children}
     </AuthCtx.Provider>
   );
